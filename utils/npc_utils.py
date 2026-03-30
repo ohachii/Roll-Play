@@ -29,6 +29,11 @@ try:
 except Exception:
     is_supabase_enabled = None  # type: ignore
 
+try:
+    from supabase import create_client as supabase_create_client  # type: ignore
+except ModuleNotFoundError:
+    supabase_create_client = None  # type: ignore
+
 class NPCContext:
     BASE_DIR = "data/npcs"
     def __init__(self, guild_id: int, mestre_id: int, npc_name: str):
@@ -106,12 +111,10 @@ class NPCContext:
                 load_dotenv()
                 supa_url = os.getenv("SUPABASE_URL")
                 supa_key = os.getenv("SUPABASE_KEY")
-                if not supa_url or not supa_key:
+                if not supa_url or not supa_key or supabase_create_client is None:
                     return []
 
-                from supabase import create_client  # type: ignore
-
-                supa = create_client(supa_url, supa_key)
+                supa = supabase_create_client(supa_url, supa_key)
                 resp = (
                     supa.table("characters")
                     .select("character_name, sheet_json")

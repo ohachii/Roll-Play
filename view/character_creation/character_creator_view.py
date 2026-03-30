@@ -378,6 +378,9 @@ def _casting_mod_from_final_scores(class_key: str, final_scores: dict[str, int])
 def _slots_lvl1_for_caster(class_key: str) -> dict[int, dict[str, int]]:
     # Versão inicial: como o /criar_ficha sempre cria no nível 1,
     # modelamos apenas os slots de 1º nível. Expansão futura: tabelas completas por nível.
+    # Bruxo (pacto): 1 slot de 1º nível no nível 1 (pact magic).
+    if class_key.strip().lower() == "bruxo":
+        return {1: {"max": 1, "used": 0}}
     if spells_srd.get_open5e_spell_lists_for_class(class_key):
         return {1: {"max": 2, "used": 0}}
     return {}

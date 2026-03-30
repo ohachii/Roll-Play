@@ -1,9 +1,9 @@
 {
     "informacoes_basicas": {
         "sistema_rpg": "dnd",
-        "titulo_apelido": "Sildro",
+        "titulo_apelido": "Kabura",
         "raca_especie": "Humano",
-        "classe_profissao": "Clérigo"
+        "classe_profissao": "Bardo"
     },
     "informacoes_gerais": {
         "nivel_rank": "1",
@@ -12,15 +12,15 @@
         "altura_peso": ""
     },
     "atributos": {
-        "Força": "13",
-        "Destreza": "14",
-        "Constituição": "15",
-        "Inteligência": "13",
-        "Sabedoria": "14",
-        "Carisma": "16"
+        "Força": "14",
+        "Destreza": "17",
+        "Constituição": "16",
+        "Inteligência": "14",
+        "Sabedoria": "15",
+        "Carisma": "18"
     },
     "salvaguardas_proficientes": [
-        "Sabedoria",
+        "Destreza",
         "Carisma"
     ],
     "pericias": {
@@ -29,82 +29,95 @@
             "bonus": 0,
             "proficiencia_dnd": "proficiente"
         },
-        "Medicina": {
-            "atributo_base": "Sabedoria",
+        "Intimidação": {
+            "atributo_base": "Carisma",
+            "bonus": 0,
+            "proficiencia_dnd": "proficiente"
+        },
+        "Enganação": {
+            "atributo_base": "Carisma",
             "bonus": 0,
             "proficiencia_dnd": "proficiente"
         }
     },
     "informacoes_combate": {
-        "vida_atual": 10,
-        "vida_maxima": 10,
+        "vida_atual": 11,
+        "vida_maxima": 11,
         "magia_atual": 2,
         "magia_maxima": 2,
-        "defesa": "12",
+        "defesa": "13",
         "resistencia_magica": "",
-        "iniciativa": "2"
+        "iniciativa": "3"
     },
     "criacao_dnd": {
         "dado_vida_classe": "d8",
         "antecedente": "Nenhum",
         "scores_pre_racial": {
-            "Força": 12,
-            "Destreza": 13,
-            "Constituição": 14,
-            "Inteligência": 12,
-            "Sabedoria": 13,
-            "Carisma": 15
+            "Força": 13,
+            "Destreza": 16,
+            "Constituição": 15,
+            "Inteligência": 13,
+            "Sabedoria": 14,
+            "Carisma": 17
         }
     },
     "inventario": {},
     "locale": "pt",
     "magias": [
         {
-            "nome": "Sacred Flame",
+            "nome": "Message",
+            "custo": "Cantrip",
+            "alcance": "120 feet",
+            "duracao": "1 round",
+            "efeito": "You point your finger toward a creature within range and whisper a message. The target (and only the target) hears the message and can reply in a whisper that only you can hear. You can cast this spell through solid objects if you are familiar with the target and know it is beyond the barrier. Magical silence, 1 foot of stone, 1 inch of common metal, a thin sheet of lead, or 3 feet of wood blocks the spell. The spell doesn't have to follow a straight line and can travel freely around corners or through openings.",
+            "nivel_int": 0
+        },
+        {
+            "nome": "Prestidigitation",
+            "custo": "Cantrip",
+            "alcance": "10 feet",
+            "duracao": "1 hour",
+            "efeito": "This spell is a minor magical trick that novice spellcasters use for practice. You create one of the following magical effects within 'range': \n- You create an instantaneous, harmless sensory effect, such as a shower of sparks, a puff of wind, faint musical notes, or an odd odor. \n- You instantaneously light or snuff out a candle, a torch, or a small campfire. \n- You instantaneously clean or soil an object no larger than 1 cubic foot. \n- You chill, warm, or flavor up to 1 cubic foot of nonliving material for 1 hour. \n- You make a color, a small mark, or a symbol appear on an object or a surface for 1 hour. \n- You create a nonmagical trinket or an illusory image that can fit in your hand and that lasts until the end of your next turn. \nIf you cast this spell multiple times, you can have up to three of its non-instantaneous effects active at a time, and you can dismiss such an effect as an action.",
+            "nivel_int": 0
+        },
+        {
+            "nome": "Vicious Mockery",
             "custo": "Cantrip",
             "alcance": "60 feet",
             "duracao": "Instantaneous",
-            "efeito": "Flame-like radiance descends on a creature that you can see within range. The target must succeed on a dexterity saving throw or take 1d8 radiant damage. The target gains no benefit from cover for this saving throw.",
+            "efeito": "You unleash a string of insults laced with subtle enchantments at a creature you can see within range. If the target can hear you (though it need not understand you), it must succeed on a Wisdom saving throw or take 1d4 psychic damage and have disadvantage on the next attack roll it makes before the end of its next turn.",
             "nivel_int": 0
         },
         {
-            "nome": "Spare the Dying",
-            "custo": "Cantrip",
-            "alcance": "Touch",
-            "duracao": "Instantaneous",
-            "efeito": "You touch a living creature that has 0 hit points. The creature becomes stable. This spell has no effect on undead or constructs.",
-            "nivel_int": 0
-        },
-        {
-            "nome": "Thaumaturgy",
-            "custo": "Cantrip",
-            "alcance": "30 feet",
-            "duracao": "1 minute",
-            "efeito": "You manifest a minor wonder, a sign of supernatural power, within range. You create one of the following magical effects within range. \n- Your voice booms up to three times as loud as normal for 1 minute. \n- You cause flames to flicker, brighten, dim, or change color for 1 minute. \n- You cause harmless tremors in the ground for 1 minute. \n- You create an instantaneous sound that originates from a point of your choice within range, such as a rumble of thunder, the cry of a raven, or ominous whispers. \n- You instantaneously cause an unlocked door or window to fly open or slam shut. \n- You alter the appearance of your eyes for 1 minute. \nIf you cast this spell multiple times, you can have up to three of its 1-minute effects active at a time, and you can dismiss such an effect as an action.",
-            "nivel_int": 0
-        },
-        {
-            "nome": "Create or Destroy Water",
+            "nome": "Healing Word",
             "custo": "1st-level",
-            "alcance": "30 feet",
+            "alcance": "60 feet",
             "duracao": "Instantaneous",
-            "efeito": "You either create or destroy water.\n\n**Create Water.** You create up to 10 gallons of clean water within range in an open container. Alternatively, the water falls as rain in a 30-foot cube within range\n\n **Destroy Water.** You destroy up to 10 gallons of water in an open container within range. Alternatively, you destroy fog in a 30-foot cube within range.",
+            "efeito": "A creature of your choice that you can see within range regains hit points equal to 1d4 + your spellcasting ability modifier. This spell has no effect on undead or constructs.",
             "nivel_int": 1
         },
         {
-            "nome": "Fog Cloud",
+            "nome": "Sleep",
             "custo": "1st-level",
-            "alcance": "120 feet",
-            "duracao": "Up to 1 hour",
-            "efeito": "You create a 20-foot-radius sphere of fog centered on a point within range. The sphere spreads around corners, and its area is heavily obscured. It lasts for the duration or until a wind of moderate or greater speed (at least 10 miles per hour) disperses it.",
+            "alcance": "90 feet",
+            "duracao": "1 minute",
+            "efeito": "This spell sends creatures into a magical slumber. Roll 5d8; the total is how many hit points of creatures this spell can affect. Creatures within 20 feet of a point you choose within range are affected in ascending order of their current hit points (ignoring unconscious creatures). Starting with the creature that has the lowest current hit points, each creature affected by this spell falls unconscious until the spell ends, the sleeper takes damage, or someone uses an action to shake or slap the sleeper awake. Subtract each creature's hit points from the total before moving on to the creature with the next lowest hit points. A creature's hit points must be equal to or less than the remaining total for that creature to be affected. Undead and creatures immune to being charmed aren't affected by this spell.",
             "nivel_int": 1
         },
         {
-            "nome": "Sanctuary",
+            "nome": "Thunderwave",
             "custo": "1st-level",
-            "alcance": "30 feet",
-            "duracao": "1 minute",
-            "efeito": "You ward a creature within range against attack. Until the spell ends, any creature who targets the warded creature with an attack or a harmful spell must first make a wisdom saving throw. On a failed save, the creature must choose a new target or lose the attack or spell. This spell doesn't protect the warded creature from area effects, such as the explosion of a fireball. If the warded creature makes an attack or casts a spell that affects an enemy creature, this spell ends.",
+            "alcance": "Self",
+            "duracao": "Instantaneous",
+            "efeito": "A wave of thunderous force sweeps out from you. Each creature in a 15-foot cube originating from you must make a constitution saving throw. On a failed save, a creature takes 2d8 thunder damage and is pushed 10 feet away from you. On a successful save, the creature takes half as much damage and isn't pushed. In addition, unsecured objects that are completely within the area of effect are automatically pushed 10 feet away from you by the spell's effect, and the spell emits a thunderous boom audible out to 300 feet.",
+            "nivel_int": 1
+        },
+        {
+            "nome": "Unseen Servant",
+            "custo": "1st-level",
+            "alcance": "60 feet",
+            "duracao": "1 hour",
+            "efeito": "This spell creates an invisible, mindless, shapeless force that performs simple tasks at your command until the spell ends. The servant springs into existence in an unoccupied space on the ground within range. It has AC 10, 1 hit point, and a Strength of 2, and it can't attack. If it drops to 0 hit points, the spell ends. Once on each of your turns as a bonus action, you can mentally command the servant to move up to 15 feet and interact with an object. The servant can perform simple tasks that a human servant could do, such as fetching things, cleaning, mending, folding clothes, lighting fires, serving food, and pouring wind. Once you give the command, the servant performs the task to the best of its ability until it completes the task, then waits for your next command. If you command the servant to perform a task that would move it more than 60 feet away from you, the spell ends.",
             "nivel_int": 1
         }
     ],
@@ -114,13 +127,13 @@
             "used": 0
         }
     },
-    "spell_save_dc": 12,
-    "spell_attack_bonus": 4,
-    "spellcasting_ability_key": "Sabedoria",
-    "spellcasting_ability_score": 14,
+    "spell_save_dc": 14,
+    "spell_attack_bonus": 6,
+    "spellcasting_ability_key": "Carisma",
+    "spellcasting_ability_score": 18,
     "flags_5e": {
         "peso_total_lb": 0.0,
-        "carga_max_lb": 195,
+        "carga_max_lb": 210,
         "sobrecarregado": false
     },
     "condicoes_automaticas": []

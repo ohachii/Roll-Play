@@ -1,0 +1,82 @@
+{
+    "informacoes_basicas": {
+        "sistema_rpg": "dnd",
+        "titulo_apelido": "Teste",
+        "raca_especie": "Meio-Elfo",
+        "classe_profissao": "Ladino"
+    },
+    "informacoes_gerais": {
+        "nivel_rank": "1",
+        "genero": "",
+        "idade": "",
+        "altura_peso": ""
+    },
+    "atributos": {
+        "Força": "10",
+        "Destreza": "11",
+        "Constituição": "12",
+        "Inteligência": "16",
+        "Sabedoria": "18",
+        "Carisma": "16"
+    },
+    "salvaguardas_proficientes": [
+        "Destreza",
+        "Inteligência"
+    ],
+    "pericias": {
+        "Intuição": {
+            "atributo_base": "Sabedoria",
+            "bonus": 0,
+            "proficiencia_dnd": "proficiente"
+        },
+        "Enganação": {
+            "atributo_base": "Carisma",
+            "bonus": 0,
+            "proficiencia_dnd": "proficiente"
+        },
+        "Intimidação": {
+            "atributo_base": "Carisma",
+            "bonus": 0,
+            "proficiencia_dnd": "proficiente"
+        },
+        "Furtividade": {
+            "atributo_base": "Destreza",
+            "bonus": 0,
+            "proficiencia_dnd": "proficiente"
+        },
+        "Atletismo": {
+            "atributo_base": "Força",
+            "bonus": 0,
+            "proficiencia_dnd": "proficiente"
+        }
+    },
+    "informacoes_combate": {
+        "vida_atual": 9,
+        "vida_maxima": 9,
+        "magia_atual": 0,
+        "magia_maxima": 0,
+        "defesa": "10",
+        "resistencia_magica": "",
+        "iniciativa": "0"
+    },
+    "criacao_dnd": {
+        "dado_vida_classe": "d8",
+        "antecedente": "Soldado",
+        "scores_pre_racial": {
+            "Força": 10,
+            "Destreza": 11,
+            "Constituição": 12,
+            "Inteligência": 15,
+            "Sabedoria": 17,
+            "Carisma": 14
+        }
+    },
+    "inventario": {},
+    "locale": "pt",
+    "flags_5e": {
+        "peso_total_lb": 0.0,
+        "carga_max_lb": 150,
+        "sobrecarregado": false
+    },
+    "condicoes_automaticas": []
+}

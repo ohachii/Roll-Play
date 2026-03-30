@@ -110,14 +110,54 @@ class PersonalSheetView(discord.ui.View):
     elif self.current_section == "atributos":
       attrs = ficha.get("atributos", {})
       embed.description = _tr("player.sheet.attributes.desc", self._loc, "Estes são os atributos base do seu personagem.")
+      sistema = ficha.get("informacoes_basicas", {}).get("sistema_rpg", "dnd")
+      is_dnd = rpg_rules.is_dnd_system(sistema)
+      abbr = {
+        "Força": "FOR",
+        "Destreza": "DES",
+        "Constituição": "CON",
+        "Inteligência": "INT",
+        "Sabedoria": "SAB",
+        "Carisma": "CAR",
+      }
       for name, value in attrs.items():
-        embed.add_field(name=name.capitalize(), value=f"`{value}`", inline=True)
+        try:
+          score = int(value)
+        except Exception:
+          score = 10
+        if is_dnd:
+          mod = rpg_rules.calculate_modifier(score)
+          label = abbr.get(name, str(name)[:3].upper())
+          embed.add_field(name=label, value=f"`{score}` ({mod:+d})", inline=True)
+        else:
+          embed.add_field(name=str(name).capitalize(), value=f"`{score}`", inline=True)
 
     elif self.current_section == "pericias":
       # Renderiza apenas: nome da perícia + bônus final (sem “categorias” genéricas).
       sistema = ficha.get("informacoes_basicas", {}).get("sistema_rpg", "dnd")
       attrs = ficha.get("atributos", {}) or {}
       pericias = ficha.get("pericias", {}) or {}
+
+      mods_line = ""
+      if rpg_rules.is_dnd_system(sistema):
+        abbr = {
+          "Força": "FOR",
+          "Destreza": "DES",
+          "Constituição": "CON",
+          "Inteligência": "INT",
+          "Sabedoria": "SAB",
+          "Carisma": "CAR",
+        }
+        order = ["Força", "Destreza", "Constituição", "Inteligência", "Sabedoria", "Carisma"]
+        parts: list[str] = []
+        for attr in order:
+          try:
+            score = int(attrs.get(attr) or 10)
+          except Exception:
+            score = 10
+          mod = rpg_rules.calculate_modifier(score)
+          parts.append(f"{abbr.get(attr, attr[:3].upper())}: {score} ({mod:+d})")
+        mods_line = " | ".join(parts)
 
       def _get_attr_score(attr_name: str) -> int:
         if not attr_name:
@@ -183,7 +223,12 @@ class PersonalSheetView(discord.ui.View):
         else:
           lines.append(left_txt)
 
-      embed.description = "\n".join(lines) if lines else _tr("player.sheet.pericias.none", self._loc, "Nenhuma perícia registrada.")
+      skills_block = "\n".join(lines) if lines else _tr(
+        "player.sheet.pericias.none",
+        self._loc,
+        "Nenhuma perícia registrada.",
+      )
+      embed.description = f"{mods_line}\n\n{skills_block}".strip() if mods_line else skills_block
 
     elif self.current_section == "combate":
       combate = ficha.get("informacoes_combate", {})

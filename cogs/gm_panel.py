@@ -11,6 +11,12 @@ from discord.ext import commands
 from discord import ui
 from dotenv import load_dotenv
 
+try:
+    # Supabase: import no topo para evitar custo/erro dentro de callbacks.
+    from supabase import create_client as supabase_create_client  # type: ignore
+except ModuleNotFoundError:
+    supabase_create_client = None  # type: ignore
+
 from data import dnd5e_srd
 from utils import dice_roller, mestre_utils, player_utils, rpg_rules
 from utils.dnd_sheet_builder import build_npc_sheet
@@ -460,6 +466,12 @@ class DeleteCharacterModal(ui.Modal, title="Deletar personagem"):
         resolved_slug: str | None = None
         try:
             load_dotenv()
+            if supabase_create_client is None:
+                return await interaction.response.send_message(
+                    "Supabase não está instalado no ambiente Python.",
+                    ephemeral=True,
+                )
+
             supa_url = os.getenv("SUPABASE_URL")
             supa_key = os.getenv("SUPABASE_KEY")
             if not supa_url or not supa_key:
@@ -468,9 +480,7 @@ class DeleteCharacterModal(ui.Modal, title="Deletar personagem"):
                     ephemeral=True,
                 )
 
-            from supabase import create_client  # type: ignore
-
-            supabase = create_client(supa_url, supa_key)
+            supabase = supabase_create_client(supa_url, supa_key)
             rows_resp = (
                 supabase.table("characters")
                 .select("character_name, sheet_json")

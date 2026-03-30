@@ -61,12 +61,31 @@ def build_player_sheet(
     """base_scores: valores após 4d6 (antes dos bônus raciais)."""
     final_scores = dnd5e_srd.apply_racial_bonuses(dict(base_scores_before_race), race)
     cls = dnd5e_srd.CLASSES.get(class_key, dnd5e_srd.CLASSES["Guerreiro"])
+    bg = dnd5e_srd.BACKGROUNDS.get(background_key, dnd5e_srd.BACKGROUNDS["Nenhum"])
     hd = int(cls["hit_die"])
     hp = starting_hp(hd, final_scores["Constituição"])
     ac = default_ac(final_scores["Destreza"])
     skills = merge_skills(class_key, background_key)
 
     atributos = {k: _str_attr(v) for k, v in final_scores.items()}
+
+    extra_languages = bg.get("extra_languages") or []
+    extra_items = bg.get("extra_items") or []
+
+    # Itens/“kits” do background aparecem no inventário como categoria aleatória,
+    # para o usuário ver no painel sem precisar preencher manualmente.
+    inventario: dict[str, Any] = {}
+    if extra_items:
+        inventario["aleatorio"] = [
+            {
+                "nome": str(item),
+                "quantidade": 1,
+                "peso": "0",
+                "descricao": "",
+                "efeito": str(item),
+            }
+            for item in extra_items
+        ]
 
     return {
         "informacoes_basicas": {
@@ -98,7 +117,14 @@ def build_player_sheet(
             "antecedente": background_key,
             "scores_pre_racial": {k: int(v) for k, v in base_scores_before_race.items()},
         },
-        "inventario": {},
+        "inventario": inventario,
+        "informacoes_extras": {
+            "idiomas": ", ".join(map(str, extra_languages)) if extra_languages else "",
+            "background": ", ".join(map(str, extra_items)) if extra_items else "",
+            "origem": background_key,
+            "personalidade": "",
+            "aparencia": "",
+        },
         "locale": "pt",
     }
 

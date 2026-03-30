@@ -17,6 +17,8 @@
 # exclusive property of the author.
 
 import discord
+from data import dnd5e_srd
+from utils import rpg_rules
 
 def create_player_summary_embed(player_data: dict, user: discord.User) -> discord.Embed:
   info_basicas = player_data.get("informacoes_basicas", {})
@@ -41,6 +43,28 @@ def create_player_summary_embed(player_data: dict, user: discord.User) -> discor
 
   if aparencia_link and not (aparencia_link.startswith("http://") or aparencia_link.startswith("https://")):
     embed.add_field(name="Aparência", value=aparencia_link, inline=False)
+
+  # Modificadores D&D 5e ao lado do valor base
+  sistema = (info_basicas.get("sistema_rpg") or "dnd")
+  if rpg_rules.is_dnd_system(sistema):
+    attrs = player_data.get("atributos", {}) or {}
+    abbr = {
+      "Força": "FOR",
+      "Destreza": "DES",
+      "Constituição": "CON",
+      "Inteligência": "INT",
+      "Sabedoria": "SAB",
+      "Carisma": "CAR",
+    }
+    parts: list[str] = []
+    for attr in dnd5e_srd.DND_ATTRIBUTES:
+      try:
+        score = int(attrs.get(attr) or 10)
+      except Exception:
+        score = 10
+      mod = rpg_rules.calculate_modifier(score)
+      parts.append(f"{abbr.get(attr, attr[:3].upper())}: {score} ({mod:+d})")
+    embed.add_field(name="Modificadores", value=" | ".join(parts), inline=False)
 
   return embed
 

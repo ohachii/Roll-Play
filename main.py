@@ -43,10 +43,12 @@ EXTENSIONS = [
     "cogs.admin",
     "cogs.notes",
     "cogs.core",
-    "cogs.player"
+    "cogs.player",
+    "cogs.gm_panel",
 ]
 
 GUILD_ID_FOR_FAST_SYNC = None
+AUTO_SYNC_GUILD_ID = 1321153391832993864
 
 class RPGbot(commands.Bot):
     def __init__(self):
@@ -64,54 +66,21 @@ class RPGbot(commands.Bot):
             except Exception as e:
                 log.exception(f"[cogs] failed to load {ext}: {e}")
 
-        try:
-            if GUILD_ID_FOR_FAST_SYNC:
-                guild_obj = discord.Object(id=int(GUILD_ID_FOR_FAST_SYNC))
-                self.tree.copy_global_to(guild=guild_obj)
-                synced = await self.tree.sync(guild=guild_obj)
-                log.info(f"[sync] guild-only ({guild_obj.id}) ok: {len(synced)} commands")
-            else:
-                synced = await self.tree.sync()
-                log.info(f"[sync] global ok: {len(synced)} commands")
-        except Exception:
-            log.exception("[sync] error on app command sync")
-
     async def on_ready(self):
         log.info(f"Logged in as {self.user} (id={self.user.id})")
+        try:
+            guild_obj = discord.Object(id=AUTO_SYNC_GUILD_ID)
+            # Copia os comandos definidos no código para a guild alvo e sincroniza.
+            self.tree.copy_global_to(guild=guild_obj)
+            synced = await self.tree.sync(guild=guild_obj)
+            log.info(f"[sync] auto guild ok: {len(synced)} commands (guild={AUTO_SYNC_GUILD_ID})")
+        except Exception:
+            log.exception("[sync] auto sync error")
         await self.change_presence(
             activity=discord.Game(name="/npc_menu • /notas")
         )
 
 bot = RPGbot()
-
-@bot.tree.command(name="sync_commands", description="Sincroniza os comandos do bot (apenas dono).")
-@is_app_owner()
-@app_commands.describe(
-    scope="Opcional: 'global' ou um ID de guild para sync rápido"
-)
-async def sync_commands(interaction: discord.Interaction, scope: str | None = None):
-    await interaction.response.defer(ephemeral=True)
-    try:
-        if scope and scope.isdigit():
-            gid = int(scope)
-            guild_obj = discord.Object(id=gid)
-            bot.tree.copy_global_to(guild=guild_obj)
-            synced = await bot.tree.sync(guild=guild_obj)
-            return await interaction.followup.send(f"✅ Sync de guild `{gid}` ok: {len(synced)} comandos.")
-        elif scope == "global":
-            synced = await bot.tree.sync()
-            return await interaction.followup.send(f"✅ Sync global ok: {len(synced)} comandos.")
-        else:
-            if GUILD_ID_FOR_FAST_SYNC:
-                guild_obj = discord.Object(id=int(GUILD_ID_FOR_FAST_SYNC))
-                bot.tree.copy_global_to(guild=guild_obj)
-                synced = await bot.tree.sync(guild=guild_obj)
-                return await interaction.followup.send(f"✅ Sync de guild `{guild_obj.id}` ok: {len(synced)} comandos.")
-            synced = await bot.tree.sync()
-            return await interaction.followup.send(f"✅ Sync global ok: {len(synced)} comandos.")
-    except Exception as e:
-        logging.exception("sync error")
-        await interaction.followup.send(f"❌ Erro no sync: {e}", ephemeral=True)
 
 def main():
     token = os.getenv("DISCORD_TOKEN") or os.getenv("TOKEN")

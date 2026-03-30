@@ -134,7 +134,7 @@ class PlayerMainMenuView(discord.ui.View):
             msg = _tr("player.menu.only_self", loc, "Você só pode interagir com o seu próprio menu.")
             await interaction.response.send_message(msg, ephemeral=True)
             return
-        view = SkillManagementView(user=interaction.user)
+        view = SkillManagementView(user=interaction.user, guild_id=interaction.guild.id if interaction.guild else None)
         content = _tr("player.menu.skills.title", loc, "⚙️ Menu de **Gerenciamento de Proficências e Expertises**")
         await interaction.response.edit_message(
             content=content,

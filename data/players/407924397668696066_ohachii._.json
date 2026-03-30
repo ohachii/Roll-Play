@@ -1,0 +1,77 @@
+{
+    "informacoes_basicas": {
+        "sistema_rpg": "dnd",
+        "titulo_apelido": "Teste",
+        "raca_especie": "Humano",
+        "classe_profissao": "Guerreiro"
+    },
+    "informacoes_gerais": {
+        "nivel_rank": "1",
+        "genero": "",
+        "idade": "",
+        "altura_peso": ""
+    },
+    "atributos": {
+        "Força": "14",
+        "Destreza": "11",
+        "Constituição": "13",
+        "Inteligência": "15",
+        "Sabedoria": "15",
+        "Carisma": "11"
+    },
+    "salvaguardas_proficientes": [
+        "Força",
+        "Constituição"
+    ],
+    "pericias": {
+        "Intuição": {
+            "atributo_base": "Sabedoria",
+            "bonus": 0,
+            "proficiencia_dnd": "proficiente"
+        },
+        "Adestramento": {
+            "atributo_base": "Sabedoria",
+            "bonus": 0,
+            "proficiencia_dnd": "proficiente"
+        },
+        "Atletismo": {
+            "atributo_base": "Força",
+            "bonus": 0,
+            "proficiencia_dnd": "proficiente"
+        },
+        "Intimidação": {
+            "atributo_base": "Carisma",
+            "bonus": 0,
+            "proficiencia_dnd": "proficiente"
+        }
+    },
+    "informacoes_combate": {
+        "vida_atual": 11,
+        "vida_maxima": 11,
+        "magia_atual": 0,
+        "magia_maxima": 0,
+        "defesa": "10",
+        "resistencia_magica": "",
+        "iniciativa": "0"
+    },
+    "criacao_dnd": {
+        "dado_vida_classe": "d10",
+        "antecedente": "Soldado",
+        "scores_pre_racial": {
+            "Força": 13,
+            "Destreza": 10,
+            "Constituição": 12,
+            "Inteligência": 14,
+            "Sabedoria": 14,
+            "Carisma": 10
+        }
+    },
+    "inventario": {},
+    "locale": "pt",
+    "flags_5e": {
+        "peso_total_lb": 0.0,
+        "carga_max_lb": 210,
+        "sobrecarregado": false
+    },
+    "condicoes_automaticas": []
+}

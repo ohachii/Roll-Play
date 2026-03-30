@@ -28,6 +28,67 @@ def set_bot_instance(bot_instance: commands.Bot):
   global bot_ref
   bot_ref = bot_instance
 
+
+def natural_d20_kept_face_from_roll_text(text: str) -> int:
+  """Face do d20 que vale para o ataque (dado mantido com vantagem/desvantagem)."""
+  m = re.search(r"\(([^)]+)\)", text)
+  if not m:
+    for x in re.findall(r"\b(\d+)\b", text):
+      v = int(x)
+      if 1 <= v <= 20:
+        return v
+    return 10
+  inner = m.group(1)
+  kept: list[int] = []
+  for part in inner.split(","):
+    part = part.strip()
+    if "~~" in part:
+      continue
+    nm = re.search(r"(\d+)", part)
+    if nm:
+      v = int(nm.group(1))
+      if 1 <= v <= 20:
+        kept.append(v)
+  if len(kept) == 1:
+    return kept[0]
+  if len(kept) >= 2:
+    low = text.lower()
+    if "kl" in low:
+      return min(kept)
+    if "kh" in low:
+      return max(kept)
+    return kept[0]
+  return 10
+
+
+def natural_d20_kept_face_from_roll(roll) -> int:
+  return natural_d20_kept_face_from_roll_text(str(roll))
+
+
+async def _roll_attack_with_d20(expr: str) -> tuple[int, str, object]:
+  translated = _translate_to_d20_syntax(expr.strip())
+  def do_roll():
+    return d20.roll(translated, allow_comments=True)
+  if bot_ref and getattr(bot_ref, "loop", None):
+    r = await bot_ref.loop.run_in_executor(None, do_roll)
+  else:
+    r = do_roll()
+  b = _clean_d20_formatting(str(r))
+  return r.total, b, r
+
+
+async def _dnd_crit_roll_damage_twice(dano_base_str: str, modifier: int) -> tuple[int, str]:
+  """D&D 5e: em crítico, rola os dados de dano duas vezes e soma o modificador uma vez."""
+  dice_1, br1 = await roll_dice(dano_base_str)
+  dice_2, br2 = await roll_dice(dano_base_str)
+  total = dice_1 + dice_2 + modifier
+  breakdown = (
+    f"Dados (crítico — 5e: 2× rolagem dos dados): {br1}\n"
+    f"+ segunda rolagem: {br2}\n"
+    f"Modificador (1×): {modifier:+}\n**Total: {total}**"
+  )
+  return total, breakdown
+
 def _translate_to_d20_syntax(dice_string: str) -> str:
   normalized = re.sub(r'\s+', '', dice_string)
 
@@ -465,112 +526,28 @@ async def execute_single_attack_roll(ficha: dict, selected_attack: dict, advanta
   attr_score_str = atributos.get(attr_name.capitalize(), atributos.get(attr_name, "10"))
   attr_score = int(attr_score_str)
   modifier = rpg_rules.get_modifier(sistema, attr_score)
+  hit_resolved = re.sub(r"\bMOD\b", str(modifier), hit_formula)
   if advantage_state == "vantagem":
-    if 'd20' in hit_formula:
-      hit_dice_expression = re.sub(r'(\d*)d20', r'2d20kh1', hit_formula)
+    if 'd20' in hit_resolved:
+      hit_dice_expression = re.sub(r'(\d*)d20', r'2d20kh1', hit_resolved)
     else:
-      hit_dice_expression = f"2d20kh1{hit_formula}"
+      hit_dice_expression = f"2d20kh1{hit_resolved}"
   elif advantage_state == "desvantagem":
-    if 'd20' in hit_formula:
-      hit_dice_expression = re.sub(r'(\d*)d20', r'2d20kl1', hit_formula)
+    if 'd20' in hit_resolved:
+      hit_dice_expression = re.sub(r'(\d*)d20', r'2d20kl1', hit_resolved)
     else:
-      hit_dice_expression = f"2d20kl1{hit_formula}"
+      hit_dice_expression = f"2d20kl1{hit_resolved}"
   else:
-    hit_dice_expression = hit_formula
-  acerto_total, acerto_breakdown = await roll_dice(hit_dice_expression)
-  crit_range = int(selected_attack.get("margem_critico", 20))
-  is_crit = False
+    hit_dice_expression = hit_resolved
   try:
-    def translate_drop_syntax(expr):
-      if re.search(r'(\d+d\d+)dl(\d+)', expr, re.IGNORECASE):
-        match = re.search(r'(\d+d\d+)dl(\d+)', expr, re.IGNORECASE)
-        dice_expr = match.group(1)
-        drop_count = int(match.group(2))
-        dice_count = int(re.search(r'(\d+)d', dice_expr).group(1))
-        keep_count = dice_count - drop_count
-        expr = re.sub(r'(\d+d\d+)dl(\d+)', f'{dice_expr}kh{keep_count}', expr, flags=re.IGNORECASE)
-      elif re.search(r'(\d+d\d+)dh(\d+)', expr, re.IGNORECASE):
-        match = re.search(r'(\d+d\d+)dh(\d+)', expr, re.IGNORECASE)
-        dice_expr = match.group(1)
-        drop_count = int(match.group(2))
-        dice_count = int(re.search(r'(\d+)d', dice_expr).group(1))
-        keep_count = dice_count - drop_count
-        expr = re.sub(r'(\d+d\d+)dh(\d+)', f'{dice_expr}kl{keep_count}', expr, flags=re.IGNORECASE)
-      return expr
-    if 'd20' in hit_dice_expression:
-      dice_expr_only = hit_dice_expression
-      dice_expr_only = re.sub(r'[\+\-]\s*\d+', '', dice_expr_only)
-      dice_expr_only = re.sub(r'[\+\-]\s*MOD', '', dice_expr_only)
-      dice_expr_only = dice_expr_only.strip()
-      if dice_expr_only.startswith('+') or dice_expr_only.startswith('-'):
-        dice_expr_only = dice_expr_only[1:].strip()
-      dice_expr_only = translate_drop_syntax(dice_expr_only)
-    else:
-      dice_expr_only = '1d20'
-    dice_roll = d20.roll(dice_expr_only)
-    d20_values = []
-    def extract_d20_values(node):
-      if hasattr(node, 'values'):
-        for child in node.values:
-          extract_d20_values(child)
-      elif hasattr(node, 'expr'):
-        extract_d20_values(node.expr)
-      elif hasattr(node, 'data'):
-        if hasattr(node.data, 'size') and node.data.size == 20:
-          if hasattr(node.data, 'values'):
-            d20_values.extend(node.data.values)
-          elif hasattr(node.data, 'total'):
-            d20_values.append(node.data.total)
-        elif hasattr(node, 'kept') and hasattr(node, 'dropped'):
-          for die in node.kept:
-            if hasattr(die, 'size') and die.size == 20:
-              d20_values.append(die.values[0] if hasattr(die, 'values') else die.total)
-          for die in node.dropped:
-            if hasattr(die, 'size') and die.size == 20:
-              d20_values.append(die.values[0] if hasattr(die, 'values') else die.total)
-        elif hasattr(node.data, 'rolled'):
-          for die in node.data.rolled:
-            if hasattr(die, 'size') and die.size == 20:
-              d20_values.append(die.values[0] if hasattr(die, 'values') else die.total)
-    extract_d20_values(dice_roll.ast)
-    if not d20_values:
-      paren_match = re.search(r'\(([^)]+)\)', acerto_breakdown)
-      if paren_match:
-        dice_str = paren_match.group(1)
-        numbers_in_paren = re.findall(r'\b(\d+)\b', dice_str)
-        d20_values = [int(n) for n in numbers_in_paren if n.isdigit() and 1 <= int(n) <= 20]
-      else:
-        numbers = re.findall(r'\b(\d+)\b', acerto_breakdown)
-        possible_dice = [int(n) for n in numbers if n.isdigit() and 1 <= int(n) <= 20]
-        if len(possible_dice) > 1:
-          if possible_dice[-1] > max(possible_dice[:-1]):
-            d20_values = possible_dice[:-1]
-          else:
-            d20_values = possible_dice
-        else:
-          d20_values = possible_dice
-    filtered_d20_values = []
-    for value in d20_values:
-      if 1 <= value <= 20:
-        filtered_d20_values.append(value)
-    d20_values = filtered_d20_values
-    for dice_value in d20_values:
-      if dice_value >= crit_range:
-        is_crit = True
-        break
-  except Exception as e:
-    try:
-      paren_match = re.search(r'\(([^)]+)\)', acerto_breakdown)
-      if paren_match:
-        dice_str = paren_match.group(1)
-        numbers_in_paren = re.findall(r'\b(\d+)\b', dice_str)
-        d20_values = [int(n) for n in numbers_in_paren if n.isdigit() and 1 <= int(n) <= 20]
-        for dice_value in d20_values:
-          if dice_value >= crit_range:
-            is_crit = True
-            break
-    except Exception as fallback_error:
-      is_crit = False
+    acerto_total, acerto_breakdown, main_roll = await _roll_attack_with_d20(hit_dice_expression)
+    natural_d20 = natural_d20_kept_face_from_roll(main_roll)
+  except Exception:
+    acerto_total, acerto_breakdown = await roll_dice(hit_dice_expression)
+    natural_d20 = natural_d20_kept_face_from_roll_text(acerto_breakdown)
+  crit_range = int(selected_attack.get("margem_critico", 20))
+  is_crit = natural_d20 >= crit_range
+  is_fumble = rpg_rules.is_dnd_system(sistema) and natural_d20 == 1
   acerto_breakdown_formatado = acerto_breakdown
   partes_dano = []
   itens_usados_nomes = []
@@ -587,15 +564,18 @@ async def execute_single_attack_roll(ficha: dict, selected_attack: dict, advanta
         itens_usados_nomes.append(item_nome)
   dano_base_str = " + ".join(partes_dano) if partes_dano else "0"
   if is_crit:
-    multiplicador = int(selected_attack.get("multiplicador_critico", 2))
-    dano_dados_total, dano_dados_breakdown = await roll_dice(dano_base_str)
-    dano_normal_total = dano_dados_total + modifier
-    dano_total = dano_normal_total * multiplicador
-    dano_breakdown = f"Multiplicador (×{multiplicador})\n"
-    dano_breakdown += f"Dados: {dano_dados_breakdown}\n"
-    if modifier != 0:
-      dano_breakdown += f"Modificador: {modifier:+}\n"
-    dano_breakdown += f"Dano normal: {dano_normal_total}"
+    if rpg_rules.is_dnd_system(sistema):
+      dano_total, dano_breakdown = await _dnd_crit_roll_damage_twice(dano_base_str, modifier)
+    else:
+      multiplicador = int(selected_attack.get("multiplicador_critico", 2))
+      dano_dados_total, dano_dados_breakdown = await roll_dice(dano_base_str)
+      dano_normal_total = dano_dados_total + modifier
+      dano_total = dano_normal_total * multiplicador
+      dano_breakdown = f"Multiplicador (×{multiplicador})\n"
+      dano_breakdown += f"Dados: {dano_dados_breakdown}\n"
+      if modifier != 0:
+        dano_breakdown += f"Modificador: {modifier:+}\n"
+      dano_breakdown += f"Dano normal: {dano_normal_total}"
   else:
     dano_dados_total, dano_dados_breakdown = await roll_dice(dano_base_str)
     dano_total = dano_dados_total + modifier
@@ -608,6 +588,8 @@ async def execute_single_attack_roll(ficha: dict, selected_attack: dict, advanta
     "dano_total": dano_total,
     "dano_breakdown": dano_breakdown,
     "is_crit": is_crit,
+    "is_fumble": is_fumble,
+    "natural_d20": natural_d20,
     "tipo_de_dano": selected_attack.get("tipo_dano", ""),
     "arma_usada_text": f" (com {', '.join(itens_usados_nomes)})" if itens_usados_nomes else "",
     "efeitos": selected_attack.get("efeitos", "").strip(),
@@ -622,81 +604,12 @@ async def execute_complex_attack_roll(ficha: dict, selected_attack: dict, advant
   attr_score_str = atributos.get(attr_name.capitalize(), atributos.get(attr_name, "10"))
   attr_score = int(attr_score_str)
   modifier = rpg_rules.get_modifier(sistema, attr_score)
-  hit_dice_expression = hit_formula
+  hit_dice_expression = re.sub(r"\bMOD\b", str(modifier), hit_formula)
   acerto_total, acerto_breakdown = await roll_dice(hit_dice_expression)
   crit_range = int(selected_attack.get("margem_critico", 20))
-  is_crit = False
-
-  try:
-    d20_matches = re.findall(r'(\d*)d20', hit_formula.lower())
-    total_d20_dice = 0
-
-    for match in d20_matches:
-      if match:
-        total_d20_dice += int(match)
-      else:
-        total_d20_dice += 1
-    if total_d20_dice > 0:
-      dice_roll = d20.roll(f"{total_d20_dice}d20")
-      d20_values = []
-      try:
-        if hasattr(dice_roll, 'data') and hasattr(dice_roll.data, 'values'):
-          d20_values = list(dice_roll.data.values)
-      except Exception as e1:
-        print(f"[DEBUG COMPLEX CRIT] Método 1 falhou: {e1}")
-
-      if not d20_values:
-        try:
-          roll_str = str(dice_roll)
-          numbers = re.findall(r'[\[\(]([\d,\s]+)[\]\)]', roll_str)
-          for num_str in numbers:
-            nums = re.findall(r'\d+', num_str)
-            d20_values.extend([int(n) for n in nums if 1 <= int(n) <= 20])
-        except Exception as e2:
-          print(f"[DEBUG COMPLEX CRIT] Método 2 falhou: {e2}")
-
-      if not d20_values:
-        try:
-          for i in range(total_d20_dice):
-            single_roll = d20.roll("1d20")
-            d20_values.append(single_roll.total)
-        except Exception as e3:
-          print(f"[DEBUG COMPLEX CRIT] Método 3 falhou: {e3}")
-      for dice_value in d20_values:
-        if dice_value >= crit_range:
-          is_crit = True
-          break
-    if not is_crit:
-      try:
-        if "(" in acerto_breakdown and ")" in acerto_breakdown:
-          paren_match = re.search(r'\(([^)]+)\)', acerto_breakdown)
-          if paren_match:
-            dice_str = paren_match.group(1)
-            numbers = re.findall(r'\b(\d+)\b', dice_str)
-            possible_dice = [int(n) for n in numbers if n.isdigit() and 1 <= int(n) <= 20]
-
-            if possible_dice:
-              for dice_value in possible_dice:
-                if dice_value >= crit_range:
-                  is_crit = True
-                  break
-        if not is_crit:
-          numbers = re.findall(r'\b(\d+)\b', acerto_breakdown)
-          possible_dice = [int(n) for n in numbers if n.isdigit() and 1 <= int(n) <= 20]
-
-          if possible_dice:
-            for dice_value in possible_dice:
-              if dice_value >= crit_range:
-                is_crit = True
-                break
-      except Exception as breakdown_error:
-        print(f"[DEBUG COMPLEX CRIT] Erro ao verificar breakdown: {breakdown_error}")
-    if not is_crit and total_d20_dice >= 10:
-      expected_crit_probability = 1 - ((crit_range - 1) / 20) ** total_d20_dice
-      if expected_crit_probability > 0.7:
-        is_crit = True
-  except Exception as crit_error:
-    is_crit = False
+  natural_d20 = natural_d20_kept_face_from_roll_text(acerto_breakdown)
+  is_crit = natural_d20 >= crit_range
+  is_fumble = rpg_rules.is_dnd_system(sistema) and natural_d20 == 1
   partes_dano = []
   itens_usados_nomes = []
 
@@ -717,22 +630,28 @@ async def execute_complex_attack_roll(ficha: dict, selected_attack: dict, advant
   if is_complex_expression(dano_base_str):
     dano_total, dano_breakdown = await roll_dice(dano_base_str)
     if is_crit:
-      multiplicador = int(selected_attack.get("multiplicador_critico", 2))
-      dano_total = dano_total * multiplicador
-      dano_breakdown = f"💥 **DANO CRÍTICO** (×{multiplicador})\nTotal: {dano_total}"
+      if rpg_rules.is_dnd_system(sistema):
+        dano_total, dano_breakdown = await _dnd_crit_roll_damage_twice(dano_base_str, modifier)
+      else:
+        multiplicador = int(selected_attack.get("multiplicador_critico", 2))
+        dano_total = dano_total * multiplicador
+        dano_breakdown = f"💥 **DANO CRÍTICO** (×{multiplicador})\nTotal: {dano_total}"
     else:
       dano_breakdown = f"Total: {dano_total}"
   else:
     if is_crit:
-      multiplicador = int(selected_attack.get("multiplicador_critico", 2))
-      dano_dados_total, dano_dados_breakdown = await roll_dice(dano_base_str)
-      dano_normal_total = dano_dados_total + modifier
-      dano_total = dano_normal_total * multiplicador
-      dano_breakdown = f"Multiplicador (×{multiplicador})\n"
-      dano_breakdown += f"Dados: {dano_dados_breakdown}\n"
-      if modifier != 0:
-        dano_breakdown += f"Modificador: {modifier:+}\n"
-      dano_breakdown += f"Dano normal: {dano_normal_total}"
+      if rpg_rules.is_dnd_system(sistema):
+        dano_total, dano_breakdown = await _dnd_crit_roll_damage_twice(dano_base_str, modifier)
+      else:
+        multiplicador = int(selected_attack.get("multiplicador_critico", 2))
+        dano_dados_total, dano_dados_breakdown = await roll_dice(dano_base_str)
+        dano_normal_total = dano_dados_total + modifier
+        dano_total = dano_normal_total * multiplicador
+        dano_breakdown = f"Multiplicador (×{multiplicador})\n"
+        dano_breakdown += f"Dados: {dano_dados_breakdown}\n"
+        if modifier != 0:
+          dano_breakdown += f"Modificador: {modifier:+}\n"
+        dano_breakdown += f"Dano normal: {dano_normal_total}"
     else:
       dano_dados_total, dano_dados_breakdown = await roll_dice(dano_base_str)
       dano_total = dano_dados_total + modifier
@@ -740,7 +659,7 @@ async def execute_complex_attack_roll(ficha: dict, selected_attack: dict, advant
       if modifier != 0:
         dano_breakdown += f"\nModificador: {modifier:+}"
   dice_count = hit_formula.count('d')
-  d20_count = total_d20_dice
+  d20_count = len(re.findall(r'(\d*)d20', hit_formula.lower()))
   acerto_breakdown_formatado = f"🎯 **Ataque Complexo**\n"
   acerto_breakdown_formatado += f"• {dice_count} tipos de dados ({d20_count} d20)\n"
   acerto_breakdown_formatado += f"💥 **Total: {acerto_total}**"
@@ -758,6 +677,8 @@ async def execute_complex_attack_roll(ficha: dict, selected_attack: dict, advant
     "dano_total": dano_total,
     "dano_breakdown": dano_breakdown,
     "is_crit": is_crit,
+    "is_fumble": is_fumble,
+    "natural_d20": natural_d20,
     "tipo_de_dano": selected_attack.get("tipo_dano", ""),
     "arma_usada_text": f" (com {', '.join(itens_usados_nomes)})" if itens_usados_nomes else "",
     "efeitos": selected_attack.get("efeitos", "").strip(),
@@ -907,14 +828,13 @@ async def execute_attribute_check(ficha: dict, sistema: str, selected_skill: str
   natural_roll, raw_d20_breakdown = await roll_dice(hit_dice_expression)
   is_crit = (natural_roll == 20)
   is_fumble = (natural_roll == 1)
-  bonus_pericia = 0
   atributo_base = selected_attribute
+  skill_data = None
   if selected_skill:
     pericias_aprendidas = ficha.get("pericias", {})
     skill_data = pericias_aprendidas.get(selected_skill)
     if skill_data and isinstance(skill_data, dict):
-      bonus_pericia = skill_data.get("bonus", 0)
-      atributo_base = skill_data.get("atributo_base")
+      atributo_base = skill_data.get("atributo_base") or atributo_base
     else:
       todas_pericias_sistema = rpg_rules.get_system_skills(sistema)
       is_categorized = isinstance(next(iter(todas_pericias_sistema.values()), None), list)
@@ -924,9 +844,24 @@ async def execute_attribute_check(ficha: dict, sistema: str, selected_skill: str
             atributo_base = attr
             break
       else:
-        atributo_base = todas_pericias_sistema.get(selected_skill)
+        atributo_base = todas_pericias_sistema.get(selected_skill) or atributo_base
+  bonus_pericia = rpg_rules.dnd_flat_bonus_for_check(
+    ficha,
+    sistema,
+    is_skill_roll=bool(selected_skill),
+    selected_skill_or_attr_name=selected_skill or selected_attribute,
+    skill_data=skill_data,
+    atributo_base=atributo_base,
+  )
   atributos_ficha = ficha.get("atributos", {})
-  attr_score_str = atributos_ficha.get(atributo_base.capitalize(), atributos_ficha.get(atributo_base.lower(), "10"))
+  ab = atributo_base or selected_attribute
+  attr_score_str = (
+      atributos_ficha.get(ab)
+      or atributos_ficha.get(ab.lower())
+      or atributos_ficha.get(ab.capitalize())
+      or atributos_ficha.get(ab.upper())
+      or "10"
+  )
   modificador_atributo = rpg_rules.get_modifier(sistema, int(attr_score_str))
   bonus_string = f"{modificador_atributo} + {bonus_pericia}"
   if temp_modifier_str:

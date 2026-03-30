@@ -100,7 +100,7 @@ class AdminCog(commands.Cog):
             return await interaction.response.send_message(msg, ephemeral=True)
 
         try:
-            mestre_utils.registrar_mestre(guild.name, interaction.user.id)
+            mestre_utils.registrar_mestre(guild.name, interaction.user.id, interaction.user.display_name)
         except Exception:
             warn = _tr("admin.register.warn", loc,
                        "⚠️ Cargo atribuído, mas houve um problema ao registrar você como Mestre internamente.")

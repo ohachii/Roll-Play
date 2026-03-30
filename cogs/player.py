@@ -27,6 +27,7 @@ from view.ficha_player.personal_sheet_view import PersonalSheetView
 from utils.embed_utils import create_player_summary_embed
 from models.shared_models.add_pet_modal import AddPetModal
 from view.pet_view.npc_pet_selector_view import NPCPetSelectorView
+from view.character_creation.character_creator_view import CreatorRaceClassView
 
 def _tr(key: str, locale: str, fallback: str, **kwargs) -> str:
     try:
@@ -50,6 +51,37 @@ class PlayerCog(commands.Cog):
         self.bot = bot
 
     @localized_command(
+        name_pt="criar_ficha",
+        desc_pt="Assistente D&D 5e: raça, classe, 4d6 (3 chances) e distribuição de atributos.",
+        name_en="create_sheet",
+        desc_en="D&D 5e wizard: race, class, 4d6×3 rolls and assign stats.",
+    )
+    @app_commands.describe(sobrescrever="Se já existir ficha, substitui pela nova.")
+    async def criar_ficha(self, interaction: discord.Interaction, sobrescrever: bool = False):
+        loc = resolve_locale(interaction, fallback="pt")
+        character_name = f"{interaction.user.id}_{interaction.user.name.lower()}"
+        gid = interaction.guild.id if interaction.guild else None
+        if player_utils.player_sheet_exists(character_name, guild_id=gid) and not sobrescrever:
+            msg = _tr(
+                "player.create.exists",
+                loc,
+                "❌ Você já tem uma ficha. Use `sobrescrever: Sim` para refazer do zero.",
+            )
+            return await interaction.response.send_message(msg, ephemeral=True)
+        emb = discord.Embed(
+            title="📜 Criação de personagem (D&D 5e)",
+            description=(
+                "1) Escolha **raça**, **classe** e **antecedente**.\n"
+                "2) **Rolagem:** 4d6 descartando o menor, **3 conjuntos** (2 rerrolagens).\n"
+                "3) **Distribua** cada valor a um atributo; depois informe o **nome**.\n"
+                "Os bônus raciais são aplicados automaticamente."
+            ),
+            color=discord.Color.green(),
+        )
+        view = CreatorRaceClassView(interaction.user, sobrescrever=sobrescrever)
+        await interaction.response.send_message(embed=emb, view=view, ephemeral=True)
+
+    @localized_command(
         name_pt="player_menu", desc_pt="Abrir o menu do player",
         name_en="player_menu", desc_en="Open the player menu"
     )
@@ -69,12 +101,72 @@ class PlayerCog(commands.Cog):
     async def minha_ficha(self, interaction: discord.Interaction):
         loc = resolve_locale(interaction, fallback="pt")
         character_name = f"{interaction.user.id}_{interaction.user.name.lower()}"
-        if not player_utils.player_sheet_exists(character_name):
+        gid = interaction.guild.id if interaction.guild else None
+        if not player_utils.player_sheet_exists(character_name, guild_id=gid):
             msg = _tr("player.sheet.missing", loc, "❌ Você ainda não tem uma ficha! Use `/player_menu` para começar.")
             return await interaction.response.send_message(msg, ephemeral=True)
-        view = PersonalSheetView(user=interaction.user)
+        view = PersonalSheetView(user=interaction.user, guild_id=gid)
         initial = await view.create_embed()
         await interaction.response.send_message(embed=initial, view=view, ephemeral=True)
+
+    @localized_command(
+        name_pt="ficha",
+        desc_pt="Escolhe qual ficha do seu arquivo carregar (se houver mais de uma).",
+        name_en="sheet",
+        desc_en="Pick which character sheet file to open.",
+    )
+    async def ficha(self, interaction: discord.Interaction):
+        loc = resolve_locale(interaction, fallback="pt")
+        gid = interaction.guild.id if interaction.guild else None
+        slugs = player_utils.list_player_sheet_slugs_for_user(interaction.user.id, guild_id=gid)
+        if not slugs:
+            msg = _tr("player.sheet.none", loc, "❌ Você ainda não tem fichas. Use `/criar_ficha` primeiro.")
+            return await interaction.response.send_message(msg, ephemeral=True)
+
+        entries: list[tuple[str, str]] = []
+        for slug in slugs[:10]:
+            try:
+                data = player_utils.load_player_sheet(slug, guild_id=interaction.guild.id if interaction.guild else None)
+                title = data.get("informacoes_basicas", {}).get("titulo_apelido") or slug
+                entries.append((slug, str(title)))
+            except Exception:
+                entries.append((slug, slug))
+
+        class SheetPickView(discord.ui.View):
+            def __init__(self, user: discord.User, items: list[tuple[str, str]]):
+                super().__init__(timeout=180)
+                self._user = user
+                self._items = items
+
+                for i, (_slug, label) in enumerate(items):
+                    btn = discord.ui.Button(
+                        label=f"📄 Ficha: {label[:20]}",
+                        style=discord.ButtonStyle.primary,
+                        custom_id=f"player:sheet:pick:{i}",
+                        row=0 if i < 2 else 1,
+                    )
+
+                    async def _cb(btn_interaction: discord.Interaction, idx: int = i):
+                        if btn_interaction.user.id != self._user.id:
+                            return await btn_interaction.response.send_message("Não é sua ficha.", ephemeral=True)
+                        char_name, _ = self._items[idx]
+                        view = PersonalSheetView(
+                            user=self._user,
+                            character_name=char_name,
+                            guild_id=btn_interaction.guild.id if btn_interaction.guild else None,
+                        )
+                        embed = await view.create_embed()
+                        await btn_interaction.response.edit_message(embed=embed, view=view, content=None)
+
+                    btn.callback = _cb
+                    self.add_item(btn)
+
+        view = SheetPickView(interaction.user, entries)
+        await interaction.response.send_message(
+            content=_tr("player.sheet.pick.prompt", loc, "Selecione qual ficha abrir:"),
+            view=view,
+            ephemeral=True,
+        )
 
     @localized_command(
         name_pt="ver_player", desc_pt="Exibe a ficha de um jogador.",
@@ -84,19 +176,24 @@ class PlayerCog(commands.Cog):
     async def ver_player(self, interaction: discord.Interaction, jogador: discord.Member):
         loc = resolve_locale(interaction, fallback="pt")
         character_name = f"{jogador.id}_{jogador.name.lower()}"
-        if not player_utils.player_sheet_exists(character_name):
+        gid = interaction.guild.id if interaction.guild else None
+        if not player_utils.player_sheet_exists(character_name, guild_id=gid):
             msg = _tr("player.sheet.other_missing", loc, "❌ O jogador **{name}** ainda não possui uma ficha.",
                       name=jogador.display_name)
             return await interaction.response.send_message(msg, ephemeral=True)
 
         if mestre_utils.verificar_mestre(interaction.guild.name, interaction.user.id):
-            view = PersonalSheetView(user=jogador)
+            view = PersonalSheetView(
+                user=jogador,
+                character_name=character_name,
+                guild_id=interaction.guild.id if interaction.guild else None,
+            )
             embed = await view.create_embed()
             header = _tr("player.sheet.master_view", loc, "👁️ Visão de Mestre: Ficha completa de **{name}**",
                          name=jogador.display_name)
             await interaction.response.send_message(header, embed=embed, view=view, ephemeral=True)
         else:
-            ps = player_utils.load_player_sheet(character_name)
+            ps = player_utils.load_player_sheet(character_name, guild_id=interaction.guild.id if interaction.guild else None)
             embed = create_player_summary_embed(ps, jogador)
             await interaction.response.send_message(embed=embed, ephemeral=True)
 
@@ -120,10 +217,10 @@ class PlayerCog(commands.Cog):
         await modal.wait()
         if modal.pet_data:
             character_name = f"{user_id}_{interaction.user.name.lower()}"
-            player_sheet = player_utils.load_player_sheet(character_name)
+            player_sheet = player_utils.load_player_sheet(character_name, guild_id=interaction.guild.id if interaction.guild else None)
             pets_list = player_sheet.setdefault("pets", [])
             pets_list.append(modal.pet_data)
-            player_utils.save_player_sheet(character_name, player_sheet)
+            player_utils.save_player_sheet(character_name, player_sheet, guild_id=interaction.guild.id if interaction.guild else None)
             msg = _tr("pet.player.saved", loc, "🐾 Pet **{pet}** foi registrado para seu personagem!",
                       pet=modal.pet_data['nome'])
             await interaction.followup.send(msg, ephemeral=True)

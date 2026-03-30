@@ -41,17 +41,18 @@ def _tr(key: str, locale: str, fallback: str, **kwargs) -> str:
 
 
 class SkillManagementView(discord.ui.View):
-  def __init__(self, user: discord.User):
+  def __init__(self, user: discord.User, guild_id: int | None = None):
     super().__init__(timeout=None)
     self.user = user
     self._loc = "pt"
+    self.guild_id = guild_id
 
     self.add_item(self.SkillActionSelect(user=self.user, parent_view=self))
     self.add_item(self.BackButton(user=self.user))
 
   def create_embed(self) -> discord.Embed:
     character_name = f"{self.user.id}_{self.user.name.lower()}"
-    ficha = player_utils.load_player_sheet(character_name)
+    ficha = player_utils.load_player_sheet(character_name, guild_id=self.guild_id)
     pericias = ficha.get("pericias", {})
 
     title = _tr("player.skills.embed.title", self._loc, "💡 Perícias de {name}", name=self.user.display_name)
@@ -70,7 +71,8 @@ class SkillManagementView(discord.ui.View):
           bonus = dados.get('bonus', 0)
           sinal = "+" if bonus >= 0 else ""
           atributo = dados.get('atributo_base', 'N/A')
-          description += f"• **{nome}** (`{atributo}` {sinal}{bonus})\n"
+          prof = dados.get("proficiencia_dnd") or "nenhuma"
+          description += f"• **{nome}** (`{atributo}` {sinal}{bonus}, prof D&D: {prof})\n"
         elif isinstance(dados, str):
           description += f"• **{nome}** (`{dados}` +0) - *Formato antigo*\n"
       embed.description = description
@@ -83,7 +85,7 @@ class SkillManagementView(discord.ui.View):
       self.parent_view = parent_view
 
       character_name = f"{user.id}_{user.name.lower()}"
-      ficha = player_utils.load_player_sheet(character_name)
+      ficha = player_utils.load_player_sheet(character_name, guild_id=self.parent_view.guild_id)
       pericias = ficha.get("pericias", {})
 
       options = [
@@ -115,7 +117,7 @@ class SkillManagementView(discord.ui.View):
       if selection == "CREATE_NEW":
         await interaction.response.send_modal(SkillEditModal(interaction))
       elif selection == "REMOVE_SKILLS":
-        view = RemoveSkillView(user=self.user, loc=self.parent_view._loc)
+        view = RemoveSkillView(user=self.user, loc=self.parent_view._loc, guild_id=self.parent_view.guild_id)
         content = _tr("player.skills.remove.prompt", self.parent_view._loc, "Selecione as perícias para remover:")
         await interaction.response.edit_message(content=content, embed=None, view=view)
       else:
@@ -135,19 +137,20 @@ class SkillManagementView(discord.ui.View):
 
 
 class RemoveSkillView(discord.ui.View):
-  def __init__(self, user: discord.User, loc: str = "pt"):
+  def __init__(self, user: discord.User, loc: str = "pt", guild_id: int | None = None):
     super().__init__(timeout=None)
     self.user = user
     self._loc = loc
     self.character_name = f"{user.id}_{user.name.lower()}"
+    self.guild_id = guild_id
 
-    ficha = player_utils.load_player_sheet(self.character_name)
+    ficha = player_utils.load_player_sheet(self.character_name, guild_id=self.guild_id)
     pericias = ficha.get("pericias", {})
 
     if pericias:
       self.add_item(self.SkillRemoveSelect(list(pericias.keys()), parent_view=self))
       self.add_item(self.ConfirmRemoveButton())
-    self.add_item(self.CancelButton(user))
+    self.add_item(self.CancelButton(user, guild_id=self.guild_id))
 
   class SkillRemoveSelect(discord.ui.Select):
     def __init__(self, skills: list, parent_view: 'RemoveSkillView'):
@@ -174,12 +177,12 @@ class RemoveSkillView(discord.ui.View):
         loc = resolve_locale(interaction, fallback="pt")
 
       skills_to_remove = self.view.children[0].values
-      ficha = player_utils.load_player_sheet(self.view.character_name)
+      ficha = player_utils.load_player_sheet(self.view.character_name, guild_id=self.view.guild_id)
       for skill in skills_to_remove:
         ficha["pericias"].pop(skill, None)
-      player_utils.save_player_sheet(self.view.character_name, ficha)
+      player_utils.save_player_sheet(self.view.character_name, ficha, guild_id=self.view.guild_id)
 
-      view = SkillManagementView(user=self.view.user)
+      view = SkillManagementView(user=self.view.user, guild_id=self.view.guild_id)
       view._loc = loc
       new_embed = view.create_embed()
       msg = _tr(
@@ -191,28 +194,38 @@ class RemoveSkillView(discord.ui.View):
       await interaction.response.edit_message(content=msg, embed=new_embed, view=view)
 
   class CancelButton(discord.ui.Button):
-    def __init__(self, user: discord.User):
+    def __init__(self, user: discord.User, guild_id: int | None = None):
       super().__init__(label="Cancelar", style=discord.ButtonStyle.secondary, row=1, custom_id="player:skills:cancel")
       self.user = user
+      self.guild_id = guild_id
 
     async def callback(self, interaction: discord.Interaction):
       loc = resolve_locale(interaction, fallback="pt")
-      view = SkillManagementView(user=self.user)
+      view = SkillManagementView(user=self.user, guild_id=self.guild_id)
       view._loc = loc
       embed = view.create_embed()
       await interaction.response.edit_message(content=None, embed=embed, view=view)
 
 
 class AttributeLinkView(discord.ui.View):
-  def __init__(self, user: discord.User, skill_name: str, skill_bonus: int):
+  def __init__(
+      self,
+      user: discord.User,
+      skill_name: str,
+      skill_bonus: int,
+      prof_dnd: str = "",
+      guild_id: int | None = None,
+  ):
     super().__init__(timeout=180)
     self.user = user
     self.skill_name = skill_name
     self.skill_bonus = skill_bonus
+    self.prof_dnd = (prof_dnd or "").strip().lower() or "nenhuma"
     self._loc = "pt"
+    self.guild_id = guild_id
 
     character_name = f"{user.id}_{user.name.lower()}"
-    ficha = player_utils.load_player_sheet(character_name)
+    ficha = player_utils.load_player_sheet(character_name, guild_id=self.guild_id)
     sistema = ficha.get("informacoes_basicas", {}).get("sistema_rpg", "dnd")
     atributos = rpg_rules.get_system_checks(sistema)
 
@@ -230,18 +243,21 @@ class AttributeLinkView(discord.ui.View):
       selected_attribute = self.values[0]
 
       character_name = f"{self.view.user.id}_{self.view.user.name.lower()}"
-      ficha = player_utils.load_player_sheet(character_name)
+      ficha = player_utils.load_player_sheet(character_name, guild_id=self.view.guild_id)
       pericias = ficha.setdefault("pericias", {})
 
-      pericias[self.view.skill_name] = {
+      entry = {
         "atributo_base": selected_attribute,
-        "bonus": self.view.skill_bonus
+        "bonus": self.view.skill_bonus,
       }
+      if self.view.prof_dnd and self.view.prof_dnd != "nenhuma":
+        entry["proficiencia_dnd"] = self.view.prof_dnd
+      pericias[self.view.skill_name] = entry
 
-      player_utils.save_player_sheet(character_name, ficha)
+      player_utils.save_player_sheet(character_name, ficha, guild_id=self.view.guild_id)
 
       from view.ficha_player.precicias_intermedio_view import SkillManagementView
-      view = SkillManagementView(user=self.view.user)
+      view = SkillManagementView(user=self.view.user, guild_id=self.view.guild_id)
       view._loc = loc
       embed = view.create_embed()
       content = _tr(

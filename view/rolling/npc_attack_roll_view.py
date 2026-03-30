@@ -113,6 +113,16 @@ class NPCAttackRollView(discord.ui.View):
         weapon=roll_results.get('arma_usada_text', "")
       )
       color = discord.Color.gold()
+    elif roll_results.get("is_fumble"):
+      title_tpl = _tr(
+        "npc.attack.title.fumble",
+        loc,
+        "💀 FALHA (natural 1) — {name} usa {attack}{weapon}",
+        name=self.npc_context.npc_name,
+        attack=self.selected_attack['nome'],
+        weapon=roll_results.get('arma_usada_text', "")
+      )
+      color = discord.Color.dark_red()
 
     adv_text = ""
     if self.advantage_state == "vantagem":

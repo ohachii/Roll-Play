@@ -22,6 +22,17 @@ import re
 
 BASE_PLAYER_PATH = "data/players"
 
+try:
+    from utils.supabase_storage import (
+        is_supabase_enabled,
+        load_character_sheet,
+        save_character_sheet,
+        delete_character_sheet,
+        list_character_names,
+    )
+except Exception:
+    is_supabase_enabled = None  # type: ignore
+
 def sanitize_filename(name: str) -> str:
     return re.sub(r'[\\/*?:"<>|]', "_", name)
 
@@ -29,23 +40,131 @@ def get_player_sheet_path(character_name: str) -> str:
     safe_name = sanitize_filename(character_name.lower().replace(" ", "_"))
     return os.path.join(BASE_PLAYER_PATH, f"{safe_name}.json")
 
-def load_player_sheet(character_name: str) -> dict:
+def load_player_sheet(character_name: str, guild_id: int | None = None) -> dict:
+    if callable(globals().get("is_supabase_enabled")) and is_supabase_enabled():
+        try:
+            discord_user_id = int(character_name.split("_", 1)[0])
+        except Exception:
+            discord_user_id = 0
+        try:
+            return load_character_sheet(
+                discord_user_id=discord_user_id,
+                character_name=character_name,
+                guild_id=guild_id,
+            )
+        except FileNotFoundError:
+            pass
+
     path = get_player_sheet_path(character_name)
     if os.path.exists(path):
         with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
+            ficha = json.load(f)
+        # Migração preguiçosa: se há Supabase e não achou, persiste no banco.
+        if callable(globals().get("is_supabase_enabled")) and is_supabase_enabled():
+            try:
+                discord_user_id = int(character_name.split("_", 1)[0])
+            except Exception:
+                discord_user_id = ficha.get("discord_user_id") or 0
+            try:
+                save_character_sheet(
+                    discord_user_id=int(discord_user_id),
+                    character_name=character_name,
+                    guild_id=ficha.get("guild_id") or guild_id,
+                    ficha=ficha,
+                )
+            except Exception:
+                pass
+        return ficha
     return {}
 
-def save_player_sheet(character_name: str, data: dict):
+def save_player_sheet(character_name: str, data: dict, guild_id: int | None = None):
+    try:
+        from utils.carry_utils import apply_encumbrance_flag
+        apply_encumbrance_flag(data)
+    except Exception:
+        pass
+
+    if callable(globals().get("is_supabase_enabled")) and is_supabase_enabled():
+        try:
+            discord_user_id = int(character_name.split("_", 1)[0])
+        except Exception:
+            discord_user_id = int(data.get("discord_user_id") or 0)
+
+        if guild_id is None:
+            guild_id = data.get("guild_id") or (data.get("informacoes_basicas") or {}).get("guild_id")
+
+        # guarda também dentro do sheet_json (ajuda em migração preguiçosa)
+        if guild_id is not None:
+            data["guild_id"] = int(guild_id)
+
+        save_character_sheet(
+            discord_user_id=discord_user_id,
+            character_name=character_name,
+            guild_id=guild_id,
+            ficha=data,
+        )
+        return
+
     path = get_player_sheet_path(character_name)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=4, ensure_ascii=False)
 
-def player_sheet_exists(character_name: str) -> bool:
+def player_sheet_exists(character_name: str, guild_id: int | None = None) -> bool:
+    if callable(globals().get("is_supabase_enabled")) and is_supabase_enabled():
+        try:
+            discord_user_id = int(character_name.split("_", 1)[0])
+        except Exception:
+            discord_user_id = 0
+        try:
+            _ = load_character_sheet(
+                discord_user_id=discord_user_id,
+                character_name=character_name,
+                guild_id=guild_id,
+            )
+            return True
+        except FileNotFoundError:
+            return False
     return os.path.exists(get_player_sheet_path(character_name))
 
+def list_player_sheet_slugs_for_user(user_id: int, guild_id: int | None = None) -> list[str]:
+    """
+    Lista os "slugs" (nome do arquivo sem .json) das fichas do usuário.
+    Nosso padrão atual é: `<user_id>_<nickname>.json` (após sanitização).
+    """
+    if callable(globals().get("is_supabase_enabled")) and is_supabase_enabled():
+        try:
+            names = list_character_names(discord_user_id=int(user_id), guild_id=guild_id)
+            if names:
+                return names
+        except Exception:
+            pass
+
+    if not os.path.exists(BASE_PLAYER_PATH):
+        return []
+    prefix = f"{int(user_id)}_"
+    out: list[str] = []
+    for fn in os.listdir(BASE_PLAYER_PATH):
+        if not fn.lower().endswith(".json"):
+            continue
+        slug = fn[:-5]  # remove .json
+        if slug.lower().startswith(prefix):
+            out.append(slug)
+    out.sort(key=lambda s: s.lower())
+    return out
+
 def delete_player_sheet(character_name: str) -> bool:
+    if callable(globals().get("is_supabase_enabled")) and is_supabase_enabled():
+        try:
+            discord_user_id = int(character_name.split("_", 1)[0])
+        except Exception:
+            discord_user_id = 0
+        return delete_character_sheet(
+            discord_user_id=discord_user_id,
+            character_name=character_name,
+            guild_id=None,
+        )
+
     path = get_player_sheet_path(character_name)
     if os.path.exists(path):
         os.remove(path)

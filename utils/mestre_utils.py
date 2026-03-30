@@ -16,6 +16,8 @@
 # from the software and are NOT covered by the AGPL. They remain the
 # exclusive property of the author.
 
+from __future__ import annotations
+
 import os
 import json
 
@@ -52,3 +54,31 @@ def adicionar_mestre(guild_name: str, mestre_id: int, mestre_nome: str):
 def verificar_mestre(guild_name: str, user_id: int) -> bool:
     mestres = carregar_mestres(guild_name)
     return any(m["id"] == user_id for m in mestres)
+
+
+def registrar_mestre(guild_name: str, user_id: int, mestre_nome: str = "Mestre") -> bool:
+    """Registra mestre (usado por /virar_mestre)."""
+    return adicionar_mestre(guild_name, user_id, mestre_nome)
+
+
+def pode_painel_mestre(guild, user) -> bool:
+    """Mestre registrado, administrador do servidor ou cargo nomeado 'Mestre'."""
+    if guild is None:
+        return False
+    try:
+        if getattr(user, "guild_permissions", None) and user.guild_permissions.administrator:
+            return True
+    except Exception:
+        pass
+    gname = getattr(guild, "name", None) or str(guild.id)
+    uid = int(getattr(user, "id", 0))
+    if verificar_mestre(gname, uid):
+        return True
+    try:
+        roles = getattr(user, "roles", ()) or ()
+        for r in roles:
+            if getattr(r, "name", None) == "Mestre":
+                return True
+    except Exception:
+        pass
+    return False

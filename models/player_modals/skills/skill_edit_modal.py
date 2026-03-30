@@ -44,9 +44,18 @@ class SkillEditModal(PlayerModalBase):
             max_length=6,
             required=True
         )
+        _prof_default = pericia_data.get("proficiencia_dnd") or "nenhuma"
+        self.prof_dnd = discord.ui.TextInput(
+            label="D&D 5e — proficiência (opcional)",
+            placeholder="nenhuma | proficiente | expertise",
+            default=str(_prof_default),
+            max_length=20,
+            required=False
+        )
 
         self.add_item(self.nome)
         self.add_item(self.bonus)
+        self.add_item(self.prof_dnd)
 
     async def on_submit(self, interaction: discord.Interaction):
         from view.ficha_player.precicias_intermedio_view import AttributeLinkView
@@ -63,7 +72,14 @@ class SkillEditModal(PlayerModalBase):
                 pericias.pop(self.skill_name_to_edit, None)
                 self.save()
 
-            view = AttributeLinkView(user=interaction.user, skill_name=nome_val, skill_bonus=bonus_val)
+            prof_raw = (self.prof_dnd.value or "nenhuma").strip().lower() or "nenhuma"
+            view = AttributeLinkView(
+                user=interaction.user,
+                skill_name=nome_val,
+                skill_bonus=bonus_val,
+                prof_dnd=prof_raw,
+                guild_id=interaction.guild.id if interaction.guild else None,
+            )
 
             await interaction.response.edit_message(
                 content=t("skill_edit.next.prompt", self.locale, name=nome_val, bonus=bonus_val),

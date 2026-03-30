@@ -225,6 +225,15 @@ class AttackRollView(discord.ui.View):
           weapon=roll_results.get('arma_usada_text', "")
         )
         color = discord.Color.gold()
+      elif roll_results.get("is_fumble"):
+        title = _tr(
+          "player.attack.single.fumble",
+          loc,
+          "💀 FALHA (natural 1) — {atk}{weapon}",
+          atk=self.selected_attack['nome'],
+          weapon=roll_results.get('arma_usada_text', "")
+        )
+        color = discord.Color.dark_red()
 
       embed = discord.Embed(title=title, color=color)
       embed.set_author(name=interaction.user.display_name, icon_url=interaction.user.display_avatar.url)

@@ -29,10 +29,14 @@ class PlayerModalBase(discord.ui.Modal):
         super().__init__(title=final_title)
         self.interaction = interaction
         self.character_name = f"{interaction.user.id}_{interaction.user.name.lower()}"
-        self.ficha = load_player_sheet(self.character_name)
+        guild_id = interaction.guild.id if interaction.guild else None
+        self.ficha = load_player_sheet(self.character_name, guild_id=guild_id)
 
     def tr(self, key: str, **kwargs) -> str:
         return t(key, self.locale, **kwargs)
 
     def save(self):
-        save_player_sheet(self.character_name, self.ficha)
+        guild_id = self.interaction.guild.id if self.interaction.guild else None
+        if guild_id is not None:
+            self.ficha["guild_id"] = int(guild_id)
+        save_player_sheet(self.character_name, self.ficha, guild_id=guild_id)

@@ -19,7 +19,6 @@
 import discord
 from utils.npc_utils import NPCContext
 from view.ficha_npc.npc_submenu import NPCMainMenuView
-import os
 from utils.i18n import t as t_raw
 from utils.locale_resolver import resolve_locale
 
@@ -61,8 +60,9 @@ class CreateNPCModal(discord.ui.Modal):
         loc = resolve_locale(interaction, fallback=self._loc)
 
         npc_name = self.npc_name_input.value.strip()
-        npc_path = NPCContext.get_npc_path(self.guild_id, self.mestre_id, npc_name)
-        if os.path.exists(npc_path):
+        # Supabase migração: a detecção de duplicata deve usar o banco (ou fallback JSON).
+        existing = NPCContext.list_npcs(self.guild_id, self.mestre_id)
+        if npc_name in existing:
             msg = _tr(
                 "npc.select.create.duplicate",
                 loc,

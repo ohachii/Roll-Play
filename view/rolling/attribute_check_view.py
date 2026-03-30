@@ -209,21 +209,28 @@ class AttributeCheckView(discord.ui.View):
             is_crit = (natural_roll == 20)
             is_fumble = (natural_roll == 1)
 
-            bonus_pericia = 0
             atributo_base_final = selected_name
-
+            skill_data = None
             if is_skill_roll:
                 todas_pericias_sistema = rpg_rules.get_system_skills(self.sistema)
                 pericias_aprendidas = self.ficha.get("pericias", {})
                 skill_data = pericias_aprendidas.get(selected_name)
                 if skill_data and isinstance(skill_data, dict):
-                    bonus_pericia = skill_data.get("bonus", 0)
-                    atributo_base_final = skill_data.get("atributo_base")
+                    atributo_base_final = skill_data.get("atributo_base") or atributo_base_final
                 else:
                     for attr, skills in todas_pericias_sistema.items():
                         if selected_name in skills:
                             atributo_base_final = attr
                             break
+
+            bonus_pericia = rpg_rules.dnd_flat_bonus_for_check(
+                self.ficha,
+                self.sistema,
+                is_skill_roll=is_skill_roll,
+                selected_skill_or_attr_name=selected_name,
+                skill_data=skill_data,
+                atributo_base=atributo_base_final,
+            )
 
             atributos_ficha = self.ficha.get("atributos", {})
             attr_score_str = (atributos_ficha.get(atributo_base_final)

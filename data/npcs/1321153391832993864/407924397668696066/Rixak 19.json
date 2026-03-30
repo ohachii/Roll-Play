@@ -1,0 +1,51 @@
+{
+    "nome": "Rixak 19",
+    "informacoes_basicas": {
+        "sistema_rpg": "dnd",
+        "titulo_apelido": "Rixak 19",
+        "raca_especie": "Humano",
+        "classe_profissao": "Guerreiro"
+    },
+    "informacoes_gerais": {
+        "nivel_rank": "1"
+    },
+    "atributos": {
+        "Força": "11",
+        "Destreza": "19",
+        "Constituição": "12",
+        "Inteligência": "13",
+        "Sabedoria": "9",
+        "Carisma": "9"
+    },
+    "salvaguardas_proficientes": [
+        "Força",
+        "Constituição"
+    ],
+    "pericias": {
+        "Atletismo": {
+            "atributo_base": "Força",
+            "bonus": 0,
+            "proficiencia_dnd": "proficiente"
+        },
+        "Intimidação": {
+            "atributo_base": "Carisma",
+            "bonus": 0,
+            "proficiencia_dnd": "proficiente"
+        }
+    },
+    "informacoes_combate": {
+        "vida_atual": 17,
+        "vida_maxima": 17,
+        "magia_atual": 0,
+        "magia_maxima": 0,
+        "defesa": "14",
+        "resistencia_magica": "",
+        "iniciativa": "4"
+    },
+    "informacoes_extras": {
+        "personalidade_ia": "Risonho demais para a situação.",
+        "dificuldade_npc": "Médio",
+        "vantagem_em_ts": false
+    },
+    "inventario": {}
+}

@@ -18,6 +18,7 @@
 
 import discord
 from utils import player_utils
+from utils import rpg_rules
 from utils.i18n import t as t_raw
 from utils.locale_resolver import resolve_locale
 
@@ -39,9 +40,11 @@ def _tr(key: str, locale: str, fallback: str, **kwargs) -> str:
 
 
 class PersonalSheetView(discord.ui.View):
-  def __init__(self, user: discord.User):
+  def __init__(self, user: discord.User, character_name: str | None = None, guild_id: int | None = None):
     super().__init__(timeout=300)
     self.user = user
+    self.character_name = character_name or f"{user.id}_{user.name.lower()}"
+    self.guild_id = guild_id
     self.current_section = "geral"
     self._loc = "pt"
 
@@ -65,8 +68,7 @@ class PersonalSheetView(discord.ui.View):
           item.label = _tr("player.sheet.btn.pets", self._loc, "Pets")
 
   async def create_embed(self) -> discord.Embed:
-    character_name = f"{self.user.id}_{self.user.name.lower()}"
-    ficha = player_utils.load_player_sheet(character_name)
+    ficha = player_utils.load_player_sheet(self.character_name, guild_id=self.guild_id)
 
     title = _tr("player.sheet.title", self._loc, "Ficha de {name}", name=self.user.display_name)
     embed = discord.Embed(title=title, color=getattr(self.user, "color", discord.Color.blurple()))
@@ -110,6 +112,78 @@ class PersonalSheetView(discord.ui.View):
       embed.description = _tr("player.sheet.attributes.desc", self._loc, "Estes são os atributos base do seu personagem.")
       for name, value in attrs.items():
         embed.add_field(name=name.capitalize(), value=f"`{value}`", inline=True)
+
+    elif self.current_section == "pericias":
+      # Renderiza apenas: nome da perícia + bônus final (sem “categorias” genéricas).
+      sistema = ficha.get("informacoes_basicas", {}).get("sistema_rpg", "dnd")
+      attrs = ficha.get("atributos", {}) or {}
+      pericias = ficha.get("pericias", {}) or {}
+
+      def _get_attr_score(attr_name: str) -> int:
+        if not attr_name:
+          return 10
+        key = str(attr_name)
+        for k in (key, key.lower(), key.capitalize(), key.upper()):
+          if k in attrs:
+            try:
+              return int(attrs.get(k))
+            except Exception:
+              return 10
+        return 10
+
+      def _infer_attribute_base(skill_name: str) -> str:
+        # Quando a perícia é “legacy” (string em vez de dict), tenta inferir pelo mapeamento do sistema.
+        try:
+          mapping = rpg_rules.get_system_skills(sistema)
+          if not mapping:
+            return "Destreza"
+          is_categorized = isinstance(next(iter(mapping.values()), None), list)
+          if is_categorized:
+            for attr, skills in mapping.items():
+              if skill_name in skills:
+                return attr
+          else:
+            return mapping.get(skill_name, "Destreza")
+        except Exception:
+          return "Destreza"
+
+      items: list[tuple[str, int]] = []
+      for skill_name, dados in pericias.items():
+        if isinstance(dados, dict):
+          atributo_base = dados.get("atributo_base") or _infer_attribute_base(skill_name)
+          attr_mod = rpg_rules.get_modifier(sistema, _get_attr_score(atributo_base))
+          if rpg_rules.is_dnd_system(sistema):
+            bonus_pericia = rpg_rules.dnd_flat_bonus_for_check(
+              ficha,
+              sistema,
+              is_skill_roll=True,
+              selected_skill_or_attr_name=str(skill_name),
+              skill_data=dados,
+              atributo_base=atributo_base,
+            )
+          else:
+            bonus_pericia = int(dados.get("bonus", 0) or 0)
+          bonus_final = attr_mod + bonus_pericia
+        else:
+          # Legado: não sabemos proficiência/bonus completo; mostramos apenas modificador do atributo base.
+          atributo_base = _infer_attribute_base(skill_name)
+          bonus_final = rpg_rules.get_modifier(sistema, _get_attr_score(atributo_base))
+        items.append((str(skill_name), int(bonus_final)))
+
+      items.sort(key=lambda x: x[0].lower())
+      # Formato em 2 colunas (usando “|” para manter limpo).
+      lines: list[str] = []
+      for i in range(0, len(items), 2):
+        left = items[i]
+        right = items[i + 1] if i + 1 < len(items) else None
+        left_txt = f"{left[0]}: {left[1]:+d}"
+        if right:
+          right_txt = f"{right[0]}: {right[1]:+d}"
+          lines.append(f"{left_txt}  |  {right_txt}")
+        else:
+          lines.append(left_txt)
+
+      embed.description = "\n".join(lines) if lines else _tr("player.sheet.pericias.none", self._loc, "Nenhuma perícia registrada.")
 
     elif self.current_section == "combate":
       combate = ficha.get("informacoes_combate", {})
@@ -293,17 +367,17 @@ class PersonalSheetView(discord.ui.View):
     self.current_section = "atributos"
     await self.update_message(interaction)
 
-  @discord.ui.button(label="Combate", style=discord.ButtonStyle.danger, custom_id="player:sheet:combat")
+  @discord.ui.button(label="Combate", style=discord.ButtonStyle.success, custom_id="player:sheet:combat")
   async def combate_button(self, interaction: discord.Interaction, button: discord.ui.Button):
     self.current_section = "combate"
     await self.update_message(interaction)
 
-  @discord.ui.button(label="Habilidades", style=discord.ButtonStyle.danger, custom_id="player:sheet:abilities")
+  @discord.ui.button(label="Habilidades", style=discord.ButtonStyle.primary, custom_id="player:sheet:abilities")
   async def habilidades_button(self, interaction: discord.Interaction, button: discord.ui.Button):
     self.current_section = "habilidades"
     await self.update_message(interaction)
 
-  @discord.ui.button(label="Inventário", style=discord.ButtonStyle.success, custom_id="player:sheet:inventory")
+  @discord.ui.button(label="Inventário", style=discord.ButtonStyle.primary, custom_id="player:sheet:inventory")
   async def inventario_button(self, interaction: discord.Interaction, button: discord.ui.Button):
     self.current_section = "inventario"
     await self.update_message(interaction)
@@ -313,7 +387,7 @@ class PersonalSheetView(discord.ui.View):
     self.current_section = "roleplay"
     await self.update_message(interaction)
 
-  @discord.ui.button(label="Perícias", style=discord.ButtonStyle.secondary, custom_id="player:sheet:skills")
+  @discord.ui.button(label="Perícias", style=discord.ButtonStyle.primary, custom_id="player:sheet:skills")
   async def pericias_button(self, interaction: discord.Interaction, button: discord.ui.Button):
     self.current_section = "pericias"
     await self.update_message(interaction)

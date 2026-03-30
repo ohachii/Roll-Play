@@ -1,0 +1,127 @@
+{
+    "informacoes_basicas": {
+        "sistema_rpg": "dnd",
+        "titulo_apelido": "Sildro",
+        "raca_especie": "Humano",
+        "classe_profissao": "Clérigo"
+    },
+    "informacoes_gerais": {
+        "nivel_rank": "1",
+        "genero": "",
+        "idade": "",
+        "altura_peso": ""
+    },
+    "atributos": {
+        "Força": "13",
+        "Destreza": "14",
+        "Constituição": "15",
+        "Inteligência": "13",
+        "Sabedoria": "14",
+        "Carisma": "16"
+    },
+    "salvaguardas_proficientes": [
+        "Sabedoria",
+        "Carisma"
+    ],
+    "pericias": {
+        "Intuição": {
+            "atributo_base": "Sabedoria",
+            "bonus": 0,
+            "proficiencia_dnd": "proficiente"
+        },
+        "Medicina": {
+            "atributo_base": "Sabedoria",
+            "bonus": 0,
+            "proficiencia_dnd": "proficiente"
+        }
+    },
+    "informacoes_combate": {
+        "vida_atual": 10,
+        "vida_maxima": 10,
+        "magia_atual": 2,
+        "magia_maxima": 2,
+        "defesa": "12",
+        "resistencia_magica": "",
+        "iniciativa": "2"
+    },
+    "criacao_dnd": {
+        "dado_vida_classe": "d8",
+        "antecedente": "Nenhum",
+        "scores_pre_racial": {
+            "Força": 12,
+            "Destreza": 13,
+            "Constituição": 14,
+            "Inteligência": 12,
+            "Sabedoria": 13,
+            "Carisma": 15
+        }
+    },
+    "inventario": {},
+    "locale": "pt",
+    "magias": [
+        {
+            "nome": "Sacred Flame",
+            "custo": "Cantrip",
+            "alcance": "60 feet",
+            "duracao": "Instantaneous",
+            "efeito": "Flame-like radiance descends on a creature that you can see within range. The target must succeed on a dexterity saving throw or take 1d8 radiant damage. The target gains no benefit from cover for this saving throw.",
+            "nivel_int": 0
+        },
+        {
+            "nome": "Spare the Dying",
+            "custo": "Cantrip",
+            "alcance": "Touch",
+            "duracao": "Instantaneous",
+            "efeito": "You touch a living creature that has 0 hit points. The creature becomes stable. This spell has no effect on undead or constructs.",
+            "nivel_int": 0
+        },
+        {
+            "nome": "Thaumaturgy",
+            "custo": "Cantrip",
+            "alcance": "30 feet",
+            "duracao": "1 minute",
+            "efeito": "You manifest a minor wonder, a sign of supernatural power, within range. You create one of the following magical effects within range. \n- Your voice booms up to three times as loud as normal for 1 minute. \n- You cause flames to flicker, brighten, dim, or change color for 1 minute. \n- You cause harmless tremors in the ground for 1 minute. \n- You create an instantaneous sound that originates from a point of your choice within range, such as a rumble of thunder, the cry of a raven, or ominous whispers. \n- You instantaneously cause an unlocked door or window to fly open or slam shut. \n- You alter the appearance of your eyes for 1 minute. \nIf you cast this spell multiple times, you can have up to three of its 1-minute effects active at a time, and you can dismiss such an effect as an action.",
+            "nivel_int": 0
+        },
+        {
+            "nome": "Create or Destroy Water",
+            "custo": "1st-level",
+            "alcance": "30 feet",
+            "duracao": "Instantaneous",
+            "efeito": "You either create or destroy water.\n\n**Create Water.** You create up to 10 gallons of clean water within range in an open container. Alternatively, the water falls as rain in a 30-foot cube within range\n\n **Destroy Water.** You destroy up to 10 gallons of water in an open container within range. Alternatively, you destroy fog in a 30-foot cube within range.",
+            "nivel_int": 1
+        },
+        {
+            "nome": "Fog Cloud",
+            "custo": "1st-level",
+            "alcance": "120 feet",
+            "duracao": "Up to 1 hour",
+            "efeito": "You create a 20-foot-radius sphere of fog centered on a point within range. The sphere spreads around corners, and its area is heavily obscured. It lasts for the duration or until a wind of moderate or greater speed (at least 10 miles per hour) disperses it.",
+            "nivel_int": 1
+        },
+        {
+            "nome": "Sanctuary",
+            "custo": "1st-level",
+            "alcance": "30 feet",
+            "duracao": "1 minute",
+            "efeito": "You ward a creature within range against attack. Until the spell ends, any creature who targets the warded creature with an attack or a harmful spell must first make a wisdom saving throw. On a failed save, the creature must choose a new target or lose the attack or spell. This spell doesn't protect the warded creature from area effects, such as the explosion of a fireball. If the warded creature makes an attack or casts a spell that affects an enemy creature, this spell ends.",
+            "nivel_int": 1
+        }
+    ],
+    "spell_slots": {
+        "1": {
+            "max": 2,
+            "used": 0
+        }
+    },
+    "spell_save_dc": 12,
+    "spell_attack_bonus": 4,
+    "spellcasting_ability_key": "Sabedoria",
+    "spellcasting_ability_score": 14,
+    "flags_5e": {
+        "peso_total_lb": 0.0,
+        "carga_max_lb": 195,
+        "sobrecarregado": false
+    },
+    "condicoes_automaticas": []
+}

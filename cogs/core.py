@@ -17,6 +17,7 @@
 # exclusive property of the author.
 
 import re
+import logging
 import discord
 from discord.ext import commands
 from discord import app_commands
@@ -24,6 +25,9 @@ from utils import dice_roller
 from utils.i18n import t as t_raw
 from utils.locale_resolver import resolve_locale
 from view.rolling.dice_hub_view import DiceHubView
+
+log = logging.getLogger("rpg-bot")
+
 
 def _tr(key: str, locale: str, fallback: str, **kwargs) -> str:
     try:
@@ -67,6 +71,68 @@ def _guess_message_locale(message: discord.Message) -> str:
     return "pt"
 
 
+def _apply_adv_token(expr: str, advantage_state: str) -> str:
+    def _apply_adv(expr_in: str, mode: str) -> str:
+        if mode not in ("vantagem", "desvantagem"):
+            return expr_in
+        def repl(match):
+            prefix = match.group(1) or ""
+            if mode == "vantagem":
+                return f"{prefix}2d20kh1"
+            return f"{prefix}2d20kl1"
+        return re.sub(r'(?i)\b(\d*)d20\b(?!k[hl]\d)', repl, expr_in, count=1)
+    return _apply_adv(expr, advantage_state)
+
+
+async def _free_roll_embed_from_parsed(content: str, loc: str, author: discord.abc.User) -> discord.Embed:
+    expr = content
+    advantage_state = "normal"
+    if re.match(r'^\s*(adv|vantagem|advantage)\b', expr, flags=re.IGNORECASE):
+        advantage_state = "vantagem"
+        expr = re.sub(r'^\s*(adv|vantagem|advantage)\b[:\-]*\s*', '', expr, flags=re.IGNORECASE)
+    elif re.match(r'^\s*(dis|desvantagem|disadvantage)\b', expr, flags=re.IGNORECASE):
+        advantage_state = "desvantagem"
+        expr = re.sub(r'^\s*(dis|desvantagem|disadvantage)\b[:\-]*\s*', '', expr, flags=re.IGNORECASE)
+
+    repeat = 1
+    m_repeat = re.match(r'^\s*(\d+)\s*#\s*(.+)$', expr, flags=re.IGNORECASE)
+    if m_repeat:
+        repeat = max(1, int(m_repeat.group(1)))
+        expr = m_repeat.group(2).strip()
+
+    expr = _apply_adv_token(expr, advantage_state)
+    expr = re.sub(r'(?i)(^|[^0-9a-zA-Z_])d(\d+)', r'\g<1>1d\2', expr)
+    results = []
+    for _ in range(repeat):
+        total, breakdown = await dice_roller.roll_dice(expr)
+        results.append((total, breakdown))
+
+    title_single = _tr("roll.free.title.single", loc, "🎲 Rolagem")
+    title_multi = _tr("roll.free.title.multi", loc, "🎲 Rolagens ({count})", count=repeat)
+    details_label = _tr("roll.free.details", loc, "Detalhes")
+
+    if repeat == 1:
+        total, breakdown = results[0]
+        embed = discord.Embed(
+            title=title_single,
+            description=f"## {total}",
+            color=discord.Color.blurple()
+        )
+        embed.add_field(name=details_label, value=f"`{breakdown}`", inline=False)
+    else:
+        embed = discord.Embed(
+            title=title_multi,
+            color=discord.Color.blurple()
+        )
+        lines = []
+        for i, (total, breakdown) in enumerate(results, start=1):
+            lines.append(f"**#{i}** → **{total}**  ·  `{breakdown}`")
+        embed.description = "\n".join(lines)
+
+    embed.set_author(name=author.display_name, icon_url=author.display_avatar.url)
+    return embed
+
+
 class CoreCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -85,6 +151,22 @@ class CoreCog(commands.Cog):
         view = DiceHubView(user=interaction.user, loc=loc)
         await interaction.response.send_message(content=title, view=view, ephemeral=True)
 
+    @app_commands.command(name="roll", description="Roll dice (e.g. 1d20+5, adv 1d20+3). Leave empty to open the hub.")
+    @app_commands.describe(expressao="Expression like 1d20+5 or 4#1d6")
+    async def roll_slash(self, interaction: discord.Interaction, expressao: str | None = None):
+        loc = resolve_locale(interaction, fallback="pt")
+        if not expressao or not str(expressao).strip():
+            title = _tr("player.dice.hub.title", loc, "🎲 Centro de Rolagens")
+            view = DiceHubView(user=interaction.user, loc=loc)
+            return await interaction.response.send_message(content=title, view=view, ephemeral=True)
+        try:
+            embed = await _free_roll_embed_from_parsed(str(expressao).strip(), loc, interaction.user)
+            await interaction.response.send_message(embed=embed)
+        except Exception:
+            log.exception("roll_slash failed")
+            err = _tr("roll.free.error", loc, "❌ Não consegui interpretar essa rolagem. Tente algo como `1d20+5`.")
+            await interaction.response.send_message(err, ephemeral=True)
+
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         if not message.content or message.author.bot:
@@ -101,65 +183,10 @@ class CoreCog(commands.Cog):
         loc = _guess_message_locale(message)
 
         try:
-            expr = content
-            advantage_state = "normal"
-            if adv_token:
-                advantage_state = "vantagem"
-                expr = re.sub(r'^\s*(adv|vantagem|advantage)\b[:\-]*\s*', '', expr, flags=re.IGNORECASE)
-            elif dis_token:
-                advantage_state = "desvantagem"
-                expr = re.sub(r'^\s*(dis|desvantagem|disadvantage)\b[:\-]*\s*', '', expr, flags=re.IGNORECASE)
-
-            repeat = 1
-            m_repeat = re.match(r'^\s*(\d+)\s*#\s*(.+)$', expr, flags=re.IGNORECASE)
-            if m_repeat:
-                repeat = max(1, int(m_repeat.group(1)))
-                expr = m_repeat.group(2).strip()
-
-            def _apply_adv(expr_in: str, mode: str) -> str:
-                if mode not in ("vantagem", "desvantagem"):
-                    return expr_in
-                def repl(match):
-                    prefix = match.group(1) or ""
-                    if mode == "vantagem":
-                        return f"{prefix}2d20kh1"
-                    return f"{prefix}2d20kl1"
-                return re.sub(r'(?i)\b(\d*)d20\b(?!k[hl]\d)', repl, expr_in, count=1)
-
-            expr = _apply_adv(expr, advantage_state)
-            expr = re.sub(r'(?i)(^|[^0-9a-zA-Z_])d(\d+)', r'\g<1>1d\2', expr)
-            results = []
-            for _ in range(repeat):
-                total, breakdown = await dice_roller.roll_dice(expr)
-                results.append((total, breakdown))
-
-            title_single = _tr("roll.free.title.single", loc, "🎲 Rolagem")
-            title_multi = _tr("roll.free.title.multi", loc, "🎲 Rolagens ({count})", count=repeat)
-            details_label = _tr("roll.free.details", loc, "Detalhes")
-
-            if repeat == 1:
-                total, breakdown = results[0]
-                embed = discord.Embed(
-                    title=title_single,
-                    description=f"## {total}",
-                    color=discord.Color.blurple()
-                )
-                embed.add_field(name=details_label, value=f"`{breakdown}`", inline=False)
-            else:
-                embed = discord.Embed(
-                    title=title_multi,
-                    color=discord.Color.blurple()
-                )
-                lines = []
-                for i, (total, breakdown) in enumerate(results, start=1):
-                    lines.append(f"**#{i}** → **{total}**  ·  `{breakdown}`")
-                embed.description = "\n".join(lines)
-
-            embed.set_author(name=message.author.display_name, icon_url=message.author.display_avatar.url)
-
+            embed = await _free_roll_embed_from_parsed(content, loc, message.author)
             await message.channel.send(embed=embed)
-
         except Exception:
+            log.exception("on_message free roll failed")
             err = _tr("roll.free.error", loc, "❌ Não consegui interpretar essa rolagem. Tente algo como `1d20+5`.")
             await message.channel.send(err)
 

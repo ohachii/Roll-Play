@@ -7,9 +7,9 @@
     },
     "informacoes_gerais": {
         "nivel_rank": "1",
-        "genero": "",
-        "idade": "",
-        "altura_peso": ""
+        "genero": "Feminino",
+        "idade": "18",
+        "altura_peso": "1,73"
     },
     "atributos": {
         "Força": "18",
@@ -80,11 +80,11 @@
         ]
     },
     "informacoes_extras": {
-        "idiomas": "",
-        "background": "Baralho de cartas, Tira de tecido",
-        "origem": "Órfão",
-        "personalidade": "",
-        "aparencia": ""
+        "idiomas": "Comum",
+        "personalidade": "Chaotic Good",
+        "aparencia": "https://i.pinimg.com/736x/e0/7b/df/e07bdff534450d1ca64de3e954fc650f.jpg",
+        "background": "TEXTO FODA",
+        "origem": "Órfão"
     },
     "locale": "pt",
     "flags_5e": {
@@ -92,5 +92,6 @@
         "carga_max_lb": 270,
         "sobrecarregado": false
     },
-    "condicoes_automaticas": []
+    "condicoes_automaticas": [],
+    "guild_id": 1321153391832993864
 }

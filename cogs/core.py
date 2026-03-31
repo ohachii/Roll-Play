@@ -142,6 +142,32 @@ class CoreCog(commands.Cog):
             pass
 
     @localized_command(
+        name_pt="bot_status",
+        desc_pt="Mostrar capacidades automatizadas atuais do bot.",
+        name_en="bot_status",
+        desc_en="Show what automation features the bot currently provides.",
+    )
+    async def bot_status(self, interaction: discord.Interaction):
+        loc = resolve_locale(interaction, fallback="pt")
+        desc = _tr(
+            "core.bot_status.body",
+            loc,
+            (
+                "Este bot está com as seguintes automações ativas:\n"
+                "• **HP Retroativo** (aumentos de Constituição ajustam PV de níveis anteriores).\n"
+                "• **Travas de ASI** (+2 pontos obrigatórios em atributos com teto por campanha).\n"
+                "• **Bônus de Proficiência Progressivo** (conforme nível D&D 5e).\n"
+                "• **Reatividade de Atributos** (CA, Iniciativa e perícias reagem a mudanças em atributos)."
+            ),
+        )
+        emb = discord.Embed(
+            title=_tr("core.bot_status.title", loc, "⚙️ Status de Automação do Bot"),
+            description=desc,
+            color=discord.Color.blurple(),
+        )
+        await interaction.response.send_message(embed=emb, ephemeral=True)
+
+    @localized_command(
         name_pt="dado", desc_pt="Abrir o hub de rolagens (ataque, testes, iniciativa).",
         name_en="dice", desc_en="Open the rolling hub (attack, checks, initiative)."
     )

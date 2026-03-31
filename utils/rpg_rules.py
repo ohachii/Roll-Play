@@ -82,6 +82,143 @@ def proficiency_bonus(character_level: int) -> int:
     return (lvl - 1) // 4 + 2
 
 
+def _fixed_hp_increase(hit_die: int) -> int:
+    """
+    Valor fixo médio do dado de vida (PHB): d6=4, d8=5, d10=6, d12=7.
+    """
+    hd = int(hit_die)
+    if hd <= 6:
+        return 4
+    if hd <= 8:
+        return 5
+    if hd <= 10:
+        return 6
+    return 7
+
+
+def advance_level(ficha: dict, new_level: int, *, hit_die: int | None = None) -> dict:
+    """
+    Aplica progressão de nível D&D 5e na ficha em memória.
+
+    Regras principais:
+    - Atualiza `informacoes_gerais.nivel_rank`
+    - Aumenta HP máximo com valor fixo médio do dado de vida + mod de Constituição.
+    - Atualiza campos derivados de proficiência (cálculo é feito on-the-fly nos roll utils).
+    - Mantém recursos de magia/chi/etc. sob responsabilidade de flows específicos,
+      mas deixa um gancho para expansão futura.
+    """
+    if not ficha:
+        return ficha
+
+    info_gerais = ficha.setdefault("informacoes_gerais", {})
+    old_level = parse_character_level(ficha)
+    lvl = max(old_level, int(new_level))
+    info_gerais["nivel_rank"] = str(lvl)
+
+    # HP: para cada nível acima de 1, soma o fixo + CON mod.
+    info_combate = ficha.setdefault("informacoes_combate", {})
+    try:
+        hp_max = int(info_combate.get("vida_maxima") or info_combate.get("vida_atual") or 0)
+    except (TypeError, ValueError):
+        hp_max = 0
+
+    attrs = ficha.get("atributos") or {}
+    con_raw = attrs.get("Constituição") or attrs.get("constituicao") or attrs.get("CON") or 10
+    try:
+        con_score = int(con_raw)
+    except (TypeError, ValueError):
+        con_score = 10
+    con_mod = calculate_modifier(con_score)
+
+    if hit_die is None:
+        # tenta inferir do campo de criação
+        criacao = ficha.get("criacao_dnd") or {}
+        dd = str(criacao.get("dado_vida_classe") or "").strip().lower()
+        if dd.startswith("d") and dd[1:].isdigit():
+            hit_die = int(dd[1:])
+        else:
+            hit_die = 8
+
+    per_level = _fixed_hp_increase(hit_die) + con_mod
+    if per_level < 1:
+        per_level = 1
+
+    gained_levels = max(0, lvl - old_level)
+    if gained_levels > 0:
+        hp_max += per_level * gained_levels
+        info_combate["vida_maxima"] = max(hp_max, info_combate.get("vida_atual") or 0)
+
+    # Recursos específicos de classe (Chi, dados de superioridade, etc.) devem ser
+    # manipulados em flows próprios, mas este helper fornece o gancho central de nível.
+
+    return ficha
+
+
+def update_class_resources(ficha: dict) -> dict:
+    """
+    Atualiza recursos escaláveis de classe conforme nível atual.
+
+    Convenções usadas na ficha:
+    - informacoes_basicas.classe_profissao: nome da classe (ex: 'Monge', 'Bruxo', 'Guerreiro')
+    - recursos: dicionário genérico para guardar pontos de Chi, slots especiais, etc.
+    - informacoes_combate.spell_slots: já modelado para slots de magia em geral.
+    """
+    if not ficha:
+        return ficha
+
+    info_basicas = ficha.get("informacoes_basicas") or {}
+    cls_name = str(info_basicas.get("classe_profissao") or "").strip()
+    if not cls_name:
+        return ficha
+
+    level = parse_character_level(ficha)
+    recursos = ficha.setdefault("recursos", {})
+
+    # Monge: Pontos de Chi = nível (a partir de 2, simplificado).
+    if cls_name.lower() == "monge":
+        recursos["pontos_chi_max"] = max(0, level)
+        recursos.setdefault("pontos_chi_atual", recursos["pontos_chi_max"])
+
+    # Bruxo: Pact Magic – slots por nível (SRD simplificado).
+    if cls_name.lower() == "bruxo":
+        # Tabela simplificada: [(nivel_min, slots, slot_level)]
+        pact_table = [
+            (1, 1, 1),
+            (2, 2, 1),
+            (3, 2, 2),
+            (5, 2, 3),
+            (7, 2, 4),
+            (9, 2, 5),
+        ]
+        slots = 1
+        slot_level = 1
+        for min_lvl, s, sl in pact_table:
+            if level >= min_lvl:
+                slots = s
+                slot_level = sl
+        recursos["pact_magic_slots_max"] = slots
+        recursos.setdefault("pact_magic_slots_atual", slots)
+        recursos["pact_magic_slot_level"] = slot_level
+
+    # Guerreiro (Mestre de Batalha): Dados de Superioridade – usa flag simples na ficha.
+    if cls_name.lower() == "guerreiro" and str(
+        info_basicas.get("subclasse") or ficha.get("subclasse") or ""
+    ).lower() in ("mestre de batalha", "battle master"):
+        # Progressão simplificada: 4 dados d8 até nível 10, depois d10/d12 conforme regras.
+        if level < 7:
+            dice_count, dice_size = 4, 8
+        elif level < 15:
+            dice_count, dice_size = 4, 10
+        else:
+            dice_count, dice_size = 4, 12
+        recursos["superiority_dice_total"] = dice_count
+        recursos.setdefault("superiority_dice_used", 0)
+        recursos["superiority_dice_size"] = dice_size
+
+    ficha["recursos"] = recursos
+    return ficha
+
+
 def parse_character_level(ficha: dict) -> int:
     """Lê nível a partir de informacoes_basicas.nivel_rank (aceita texto como '5' ou '5º nível')."""
     info = ficha.get("informacoes_basicas") or ficha.get("informacoes_gerais") or {}

@@ -1,48 +1,53 @@
 {
     "informacoes_basicas": {
         "sistema_rpg": "dnd",
-        "titulo_apelido": "Mei Lin",
-        "raca_especie": "Humano",
+        "titulo_apelido": "Anan Mong'e",
+        "raca_especie": "Anão",
         "classe_profissao": "Monge"
     },
     "informacoes_gerais": {
         "nivel_rank": "1",
-        "genero": "Feminino",
-        "idade": "18",
-        "altura_peso": "1,73"
+        "genero": "",
+        "idade": "",
+        "altura_peso": ""
     },
     "atributos": {
-        "Força": "18",
+        "Força": "13",
         "Destreza": "17",
-        "Constituição": "17",
-        "Inteligência": "8",
-        "Sabedoria": "16",
-        "Carisma": "16"
+        "Constituição": "14",
+        "Inteligência": "10",
+        "Sabedoria": "15",
+        "Carisma": "11"
     },
     "salvaguardas_proficientes": [
         "Destreza",
         "Sabedoria"
     ],
     "pericias": {
+        "Intuição": {
+            "atributo_base": "Sabedoria",
+            "bonus": 0,
+            "proficiencia_dnd": "proficiente"
+        },
         "História": {
             "atributo_base": "Inteligência",
             "bonus": 0,
             "proficiencia_dnd": "proficiente"
         },
-        "Furtividade": {
-            "atributo_base": "Destreza",
+        "Medicina": {
+            "atributo_base": "Sabedoria",
             "bonus": 0,
             "proficiencia_dnd": "proficiente"
         },
-        "Prestidigitação": {
-            "atributo_base": "Destreza",
+        "Religião": {
+            "atributo_base": "Inteligência",
             "bonus": 0,
             "proficiencia_dnd": "proficiente"
         }
     },
     "informacoes_combate": {
-        "vida_atual": 11,
-        "vida_maxima": 11,
+        "vida_atual": 10,
+        "vida_maxima": 10,
         "magia_atual": 0,
         "magia_maxima": 0,
         "defesa": "13",
@@ -51,48 +56,46 @@
     },
     "criacao_dnd": {
         "dado_vida_classe": "d8",
-        "antecedente": "Órfão",
+        "antecedente": "Eremita",
         "scores_pre_racial": {
-            "Força": 17,
-            "Destreza": 16,
-            "Constituição": 16,
-            "Inteligência": 7,
+            "Força": 13,
+            "Destreza": 17,
+            "Constituição": 12,
+            "Inteligência": 10,
             "Sabedoria": 15,
-            "Carisma": 15
+            "Carisma": 11
         }
     },
     "inventario": {
         "aleatorio": [
             {
-                "nome": "Baralho de cartas",
+                "nome": "Conjunto de roupas",
                 "quantidade": 1,
                 "peso": "0",
                 "descricao": "",
-                "efeito": "Baralho de cartas"
+                "efeito": "Conjunto de roupas"
             },
             {
-                "nome": "Tira de tecido",
+                "nome": "Kit do eremita (livros/objetos)",
                 "quantidade": 1,
                 "peso": "0",
                 "descricao": "",
-                "efeito": "Tira de tecido"
+                "efeito": "Kit do eremita (livros/objetos)"
             }
         ]
     },
     "informacoes_extras": {
-        "idiomas": "Comum",
-        "personalidade": "Chaotic Good",
-        "aparencia": "https://i.pinimg.com/736x/e0/7b/df/e07bdff534450d1ca64de3e954fc650f.jpg",
-        "background": "TEXTO FODA",
-        "origem": "Órfão"
+        "idiomas": "",
+        "background": "Conjunto de roupas, Kit do eremita (livros/objetos)",
+        "origem": "Eremita",
+        "personalidade": "",
+        "aparencia": ""
     },
     "locale": "pt",
     "flags_5e": {
         "peso_total_lb": 0.0,
-        "carga_max_lb": 270,
+        "carga_max_lb": 195,
         "sobrecarregado": false
     },
-    "condicoes_automaticas": [],
-    "guild_id": 1321153391832993864,
-    "ataques_em_progresso": {}
+    "condicoes_automaticas": []
 }

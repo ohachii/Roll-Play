@@ -23,6 +23,7 @@ from utils.checks import is_app_owner
 from utils.i18n import t as t_raw
 from utils.locale_resolver import resolve_locale
 from utils import mestre_utils
+from utils import content_templates
 
 def _tr(key: str, locale: str, fallback: str, **kwargs) -> str:
     try:
@@ -113,6 +114,147 @@ class AdminCog(commands.Cog):
                   "✅ Você agora é Mestre neste servidor{created}. Use `/npc_menu` para gerenciar seus NPCs.",
                   created=created_txt)
         await interaction.response.send_message(msg, ephemeral=True)
+
+    @app_commands.checks.has_permissions(administrator=True)
+    @app_commands.command(
+        name="admin_conteudo",
+        description="Gerenciar templates de Raças, Classes e Origens (homebrew/SRD).",
+    )
+    async def admin_conteudo(self, interaction: discord.Interaction):
+        """Abre painel de gerenciamento de conteúdo SRD/Homebrew."""
+        loc = resolve_locale(interaction, fallback="pt")
+        if interaction.guild is None:
+            msg = _tr(
+                "admin.content.guild_only",
+                loc,
+                "❌ Este painel só pode ser usado dentro de um servidor.",
+            )
+            return await interaction.response.send_message(msg, ephemeral=True)
+
+        class ContentAdminView(discord.ui.View):
+            def __init__(self, user: discord.User):
+                super().__init__(timeout=300)
+                self.user = user
+
+            async def interaction_check(self, i: discord.Interaction) -> bool:
+                return i.user.id == self.user.id
+
+        view = ContentAdminView(interaction.user)
+
+        @discord.ui.button(label="+ Nova Raça", style=discord.ButtonStyle.primary, row=0)
+        async def new_race_button(btn_inter: discord.Interaction, button: discord.ui.Button):  # type: ignore[override]
+            if btn_inter.user.id != interaction.user.id:
+                return await btn_inter.response.send_message("Não é seu painel.", ephemeral=True)
+
+            class NewRaceModal(discord.ui.Modal, title="Nova Raça / Editar Raça"):
+                def __init__(self, nome_inicial: str = ""):
+                    super().__init__()
+                    self.nome = discord.ui.TextInput(
+                        label="Nome da raça",
+                        placeholder="Ex: Meio-Ciborgue",
+                        default=nome_inicial,
+                        max_length=80,
+                    )
+                    self.deslocamento = discord.ui.TextInput(
+                        label="Deslocamento",
+                        placeholder="Ex: 9m",
+                        default="9m",
+                        max_length=32,
+                    )
+                    self.bonus = discord.ui.TextInput(
+                        label="Bônus de Atributo",
+                        placeholder="Ex: Força +2, Inteligência +1",
+                        style=discord.TextStyle.paragraph,
+                        max_length=200,
+                    )
+                    self.descricao = discord.ui.TextInput(
+                        label="Descrição",
+                        placeholder="Resumo da raça (fluff/regras).",
+                        style=discord.TextStyle.paragraph,
+                        required=False,
+                        max_length=500,
+                    )
+                    self.add_item(self.nome)
+                    self.add_item(self.deslocamento)
+                    self.add_item(self.bonus)
+                    self.add_item(self.descricao)
+
+                async def on_submit(self, modal_inter: discord.Interaction):
+                    if modal_inter.user.id != interaction.user.id:
+                        return await modal_inter.response.send_message("Não é seu painel.", ephemeral=True)
+                    await modal_inter.response.defer(ephemeral=True)
+
+                    raw_name = str(self.nome.value).strip()
+                    if not raw_name:
+                        return await modal_inter.followup.send("❌ Nome da raça é obrigatório.", ephemeral=True)
+
+                    # parse bônus: "Força +2, Inteligência +1"
+                    bonus_map: dict[str, int] = {}
+                    allowed = {"força", "forca", "destreza", "constituição", "constituicao", "inteligência", "inteligencia", "sabedoria", "carisma"}
+                    parts = str(self.bonus.value or "").split(",")
+                    for part in parts:
+                        part = part.strip()
+                        if not part:
+                            continue
+                        tokens = part.replace("+", " +").replace("-", " -").split()
+                        if len(tokens) < 2:
+                            continue
+                        attr = tokens[0].strip().lower()
+                        if attr not in allowed:
+                            return await modal_inter.followup.send(
+                                "❌ Use nomes completos de atributos: Força, Destreza, Constituição, Inteligência, Sabedoria, Carisma.",
+                                ephemeral=True,
+                            )
+                        try:
+                            value = int(tokens[-1])
+                        except Exception:
+                            return await modal_inter.followup.send(
+                                "❌ Não consegui ler o valor numérico em um dos bônus.",
+                                ephemeral=True,
+                            )
+                        key_norm = attr.capitalize().replace("ç", "ç").replace("cao", "ção")
+                        if key_norm.startswith("Forc"):
+                            key_norm = "Força"
+                        elif key_norm.startswith("Dest"):
+                            key_norm = "Destreza"
+                        elif key_norm.startswith("Const"):
+                            key_norm = "Constituição"
+                        elif key_norm.startswith("Intel"):
+                            key_norm = "Inteligência"
+                        elif key_norm.startswith("Sab"):
+                            key_norm = "Sabedoria"
+                        elif key_norm.startswith("Car"):
+                            key_norm = "Carisma"
+                        bonus_map[key_norm] = int(value)
+
+                    payload = {
+                        "nome": raw_name,
+                        "deslocamento": str(self.deslocamento.value or "9m"),
+                        "bonus_atributo": bonus_map,
+                        "descricao": str(self.descricao.value or ""),
+                    }
+                    content_templates.upsert_race_template(payload)
+                    print(f"[CONTENT UPDATE] Raça {raw_name} atualizada por {interaction.user.id}")
+                    await modal_inter.followup.send(
+                        f"✅ Raça **{raw_name}** salva/atualizada com sucesso.",
+                        ephemeral=True,
+                    )
+
+            await btn_inter.response.send_modal(NewRaceModal())
+
+        view.add_item(new_race_button)  # type: ignore[arg-type]
+
+        races = content_templates.get_race_templates()
+        race_labels = ", ".join(r["nome"] for r in races[:25]) or "Nenhuma raça disponível ainda."
+        emb = discord.Embed(
+            title="⚙️ Painel de Conteúdo (SRD / Homebrew)",
+            description=(
+                "Gerencie raças, classes e origens que serão usadas na criação de fichas.\n\n"
+                f"**Raças atuais (amostra):** {race_labels}"
+            ),
+            color=discord.Color.orange(),
+        )
+        await interaction.response.send_message(embed=emb, view=view, ephemeral=True)
 
 
 async def setup(bot: commands.Bot):

@@ -7,6 +7,7 @@ from discord import ui
 from data import dnd5e_srd
 from data import spells_srd
 from utils import player_utils, rpg_rules
+from utils import content_templates
 from utils.dnd_sheet_builder import build_player_sheet
 
 
@@ -42,9 +43,12 @@ class CreatorRaceClassView(ui.View):
         self.add_item(ContinueRaceClassButton())
 
     def _race_select(self) -> ui.Select:
+        races = content_templates.get_race_templates()
         sel = ui.Select(
             placeholder="1. Raça",
-            options=[discord.SelectOption(label=n, value=n) for n in dnd5e_srd.race_names()[:25]],
+            options=[
+                discord.SelectOption(label=r["nome"], value=r["nome"]) for r in races[:25]
+            ],
             row=0,
         )
 
@@ -58,9 +62,12 @@ class CreatorRaceClassView(ui.View):
         return sel
 
     def _class_select(self) -> ui.Select:
+        classes = content_templates.get_class_templates()
         sel = ui.Select(
             placeholder="2. Classe",
-            options=[discord.SelectOption(label=n, value=n) for n in dnd5e_srd.class_names()[:25]],
+            options=[
+                discord.SelectOption(label=c["nome"], value=c["nome"]) for c in classes[:25]
+            ],
             row=1,
         )
 
@@ -74,9 +81,12 @@ class CreatorRaceClassView(ui.View):
         return sel
 
     def _bg_select(self) -> ui.Select:
+        backgrounds = content_templates.get_background_templates()
         sel = ui.Select(
             placeholder="3. Antecedente",
-            options=[discord.SelectOption(label=n, value=n) for n in dnd5e_srd.background_names()[:25]],
+            options=[
+                discord.SelectOption(label=b["nome"], value=b["nome"]) for b in backgrounds[:25]
+            ],
             row=2,
         )
 

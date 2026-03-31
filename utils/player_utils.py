@@ -92,10 +92,11 @@ def save_player_sheet(character_name: str, data: dict, guild_id: int | None = No
 
         if guild_id is None:
             guild_id = data.get("guild_id") or (data.get("informacoes_basicas") or {}).get("guild_id")
+        if guild_id is None:
+            guild_id = 0
 
         # guarda também dentro do sheet_json (ajuda em migração preguiçosa)
-        if guild_id is not None:
-            data["guild_id"] = int(guild_id)
+        data["guild_id"] = int(guild_id)
 
         save_character_sheet(
             discord_user_id=discord_user_id,

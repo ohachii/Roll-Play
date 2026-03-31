@@ -10,8 +10,13 @@ from utils import player_utils, rpg_rules
 from utils.dnd_sheet_builder import build_player_sheet
 
 
+def get_mod_str(val: int) -> str:
+    mod = rpg_rules.get_modifier("dnd", int(val))
+    return f"{mod:+d}"
+
+
 def _embed_stats(rolls: list[int], rerolls_left: int) -> discord.Embed:
-    line = ", ".join(str(x) for x in sorted(rolls, reverse=True))
+    line = ", ".join(f"{x} ({get_mod_str(x)})" for x in sorted(rolls, reverse=True))
     usados = 3 - rerolls_left
     emb = discord.Embed(
         title="🎲 Rolagem de atributos (4d6, descarta o menor)",
@@ -97,13 +102,21 @@ class ContinueRaceClassButton(ui.Button):
             return await interaction.response.send_message(
                 "Selecione raça, classe e antecedente nos menus acima.", ephemeral=True
             )
+        # Debounce rápido para evitar cliques duplos antes da troca de view.
+        self.disabled = True
+        for item in view.children:
+            try:
+                item.disabled = True
+            except Exception:
+                pass
+        await interaction.response.defer()
         v = StatsRollView(
             user=view.user,
             race=view.race_pick,
             class_key=view.class_pick,
             background=view.bg_pick,
         )
-        await interaction.response.edit_message(embed=_embed_stats(v.current_rolls, v.rerolls_left), view=v)
+        await interaction.edit_original_response(embed=_embed_stats(v.current_rolls, v.rerolls_left), view=v)
 
 
 class StatsRollView(ui.View):
@@ -136,12 +149,19 @@ class RerollStatsButton(ui.Button):
             return await interaction.response.send_message(
                 "Você já usou as 3 rolagens. Aceite este conjunto.", ephemeral=True
             )
+        self.disabled = True
+        for item in view.children:
+            try:
+                item.disabled = True
+            except Exception:
+                pass
+        await interaction.response.defer()
         view.rerolls_left -= 1
         view.current_rolls = rpg_rules.roll_stats_5e()
         view.clear_items()
         view.add_item(RerollStatsButton(disabled=view.rerolls_left <= 0))
         view.add_item(AcceptStatsButton())
-        await interaction.response.edit_message(embed=_embed_stats(view.current_rolls, view.rerolls_left), view=view)
+        await interaction.edit_original_response(embed=_embed_stats(view.current_rolls, view.rerolls_left), view=view)
 
 
 class AcceptStatsButton(ui.Button):
@@ -152,6 +172,13 @@ class AcceptStatsButton(ui.Button):
         view: StatsRollView = self.view  # type: ignore
         if interaction.user.id != view.user.id:
             return await interaction.response.send_message("Não é sua ficha.", ephemeral=True)
+        self.disabled = True
+        for item in view.children:
+            try:
+                item.disabled = True
+            except Exception:
+                pass
+        await interaction.response.defer()
         av = AssignStatsView(
             user=view.user,
             race=view.race,
@@ -160,7 +187,7 @@ class AcceptStatsButton(ui.Button):
             pool=list(view.current_rolls),
         )
         av.refresh()
-        await interaction.response.edit_message(embed=av.embed(), view=av)
+        await interaction.edit_original_response(embed=av.embed(), view=av)
 
 
 class AssignStatsView(ui.View):
@@ -181,10 +208,12 @@ class AssignStatsView(ui.View):
         self.assignments: dict[str, int] = {}
         self.attr_order = list(dnd5e_srd.DND_ATTRIBUTES)
         self.step = 0
+        # Evita cliques duplos enquanto atualizamos a view/consultamos dados.
+        self._processing = False
 
     def embed(self) -> discord.Embed:
-        done = ", ".join(f"{k}: {v}" for k, v in self.assignments.items()) or "—"
-        pend = ", ".join(str(x) for x in sorted(self.pool, reverse=True)) if self.pool else "—"
+        done = ", ".join(f"{k}: {v} ({get_mod_str(v)})" for k, v in self.assignments.items()) or "—"
+        pend = ", ".join(f"{x} ({get_mod_str(x)})" for x in sorted(self.pool, reverse=True)) if self.pool else "—"
         emb = discord.Embed(
             title="📌 Distribuir atributos",
             description=f"**Já definidos:** {done}\n**Disponíveis:** {pend}",
@@ -212,20 +241,37 @@ class StatValueSelect(ui.Select):
             for i in range(min(len(parent.pool), 25))
         ]
         super().__init__(placeholder=f"Valor para {attr}", options=opts, row=0)
-        self._parent = parent
+        self.parent_view = parent
         self._attr = attr
 
     async def callback(self, interaction: discord.Interaction):
-        if interaction.user.id != self._parent.user.id:
+        if interaction.user.id != self.parent_view.user.id:
             return await interaction.response.send_message("Não é sua ficha.", ephemeral=True)
-        idx = int(self.values[0])
-        if idx < 0 or idx >= len(self._parent.pool):
-            return await interaction.response.send_message("Índice inválido.", ephemeral=True)
-        v = self._parent.pool.pop(idx)
-        self._parent.assignments[self._attr] = v
-        self._parent.step += 1
-        self._parent.refresh()
-        await interaction.response.edit_message(embed=self._parent.embed(), view=self._parent)
+        parent = self.parent_view
+        if parent._processing:
+            return await interaction.response.defer()
+
+        parent._processing = True
+        try:
+            # Debounce: impede cliques múltiplos enquanto processamos a escolha.
+            self.disabled = True
+            for item in parent.children:
+                try:
+                    item.disabled = True
+                except Exception:
+                    pass
+            await interaction.response.defer()
+
+            idx = int(self.values[0])
+            if idx < 0 or idx >= len(parent.pool):
+                return await interaction.followup.send("Índice inválido.", ephemeral=True)
+            v = parent.pool.pop(idx)
+            parent.assignments[self._attr] = v
+            parent.step += 1
+            parent.refresh()
+            await interaction.edit_original_response(embed=parent.embed(), view=parent)
+        finally:
+            parent._processing = False
 
 
 class FinishAssignButton(ui.Button):
@@ -236,41 +282,57 @@ class FinishAssignButton(ui.Button):
         view: AssignStatsView = self.view  # type: ignore
         if interaction.user.id != view.user.id:
             return await interaction.response.send_message("Não é sua ficha.", ephemeral=True)
-        if len(view.assignments) != 6:
-            return await interaction.response.send_message("Atribuição incompleta.", ephemeral=True)
-        final_scores = dnd5e_srd.apply_racial_bonuses(view.assignments.copy(), view.race)
-        if spells_srd.get_open5e_spell_lists_for_class(view.class_key):
-            return await interaction.response.edit_message(
-                embed=discord.Embed(
-                    title="🔮 Seleção de magias",
-                    description="Escolha seus truques antes de continuar.",
-                    color=discord.Color.blue(),
-                ),
-                view=SpellCantripsPickView(
+        if view._processing:
+            return await interaction.response.defer()
+
+        view._processing = True
+        try:
+            # Debounce: bloqueia cliques duplos enquanto fechamos a distribuição.
+            self.disabled = True
+            for item in view.children:
+                try:
+                    item.disabled = True
+                except Exception:
+                    pass
+            if len(view.assignments) != 6:
+                return await interaction.response.send_message("Atribuição incompleta.", ephemeral=True)
+
+            if spells_srd.get_open5e_spell_lists_for_class(view.class_key):
+                await interaction.response.defer()
+                final_scores = dnd5e_srd.apply_racial_bonuses(view.assignments.copy(), view.race)
+                return await interaction.edit_original_response(
+                    embed=discord.Embed(
+                        title="🔮 Seleção de magias",
+                        description="Escolha seus truques antes de continuar.",
+                        color=discord.Color.blue(),
+                    ),
+                    view=SpellCantripsPickView(
+                        user=view.user,
+                        race=view.race,
+                        class_key=view.class_key,
+                        background=view.background,
+                        base_scores_before_race=view.assignments.copy(),
+                        final_scores=final_scores,
+                    ),
+                )
+
+            await interaction.response.send_modal(
+                FinalizeCharacterModal(
                     user=view.user,
                     race=view.race,
                     class_key=view.class_key,
                     background=view.background,
-                    base_scores_before_race=view.assignments.copy(),
-                    final_scores=final_scores,
-                ),
+                    base_scores=view.assignments.copy(),
+                    selected_spells=[],
+                    spell_slots={},
+                    spell_save_dc=None,
+                    spell_attack_bonus=None,
+                    spellcasting_ability_key=None,
+                    spellcasting_ability_score=None,
+                )
             )
-
-        await interaction.response.send_modal(
-            FinalizeCharacterModal(
-                user=view.user,
-                race=view.race,
-                class_key=view.class_key,
-                background=view.background,
-                base_scores=view.assignments.copy(),
-                selected_spells=[],
-                spell_slots={},
-                spell_save_dc=None,
-                spell_attack_bonus=None,
-                spellcasting_ability_key=None,
-                spellcasting_ability_score=None,
-            )
-        )
+        finally:
+            view._processing = False
 
 
 class FinalizeCharacterModal(ui.Modal, title="Nome do personagem"):
@@ -306,6 +368,12 @@ class FinalizeCharacterModal(ui.Modal, title="Nome do personagem"):
     async def on_submit(self, interaction: discord.Interaction):
         if interaction.user.id != self.user.id:
             return await interaction.response.send_message("Inválido.", ephemeral=True)
+        if interaction.guild is None:
+            return await interaction.response.send_message(
+                "Esse fluxo precisa ser usado dentro de um servidor para salvar a ficha.",
+                ephemeral=True,
+            )
+        await interaction.response.defer(ephemeral=True)
         character_name = f"{self.user.id}_{self.user.name.lower()}"
         sheet = build_player_sheet(
             titulo_apelido=str(self.nome.value).strip(),
@@ -330,9 +398,9 @@ class FinalizeCharacterModal(ui.Modal, title="Nome do personagem"):
         player_utils.save_player_sheet(
             character_name,
             sheet,
-            guild_id=interaction.guild.id if interaction.guild else None,
+            guild_id=interaction.guild.id,
         )
-        await interaction.response.send_message(
+        await interaction.followup.send(
             f"✅ Ficha **{self.nome.value}** criada! Use `/minha_ficha` ou `/player_menu`.",
             ephemeral=True,
         )
@@ -427,7 +495,8 @@ class SpellCantripsPickView(ui.View):
             if interaction.user.id != self.user.id:
                 return await interaction.response.send_message("Não é sua ficha.", ephemeral=True)
             self.selected_slugs = list(self.select.values)
-            await interaction.response.edit_message(embed=self._embed(), view=self)
+            await interaction.response.defer()
+            await interaction.edit_original_response(embed=self._embed(), view=self)
 
         self.select.callback = cb
         self.add_item(self.select)
@@ -467,7 +536,8 @@ class SpellCantripsPickView(ui.View):
                 f"Você precisa escolher exatamente **{self.cantrips_known}** truques.",
                 ephemeral=True,
             )
-        await interaction.response.edit_message(
+        await interaction.response.defer()
+        await interaction.edit_original_response(
             embed=discord.Embed(title="⚡ Magias de 1º nível", description="Agora escolha suas magias de 1º nível.", color=discord.Color.blue()),
             view=SpellLevelPickView(
                 user=self.user,
@@ -500,6 +570,7 @@ class SpellLevelPickView(ui.View):
         self.base_scores_before_race = base_scores_before_race
         self.final_scores = final_scores
         self.level = 1
+        self._processing = False  # debounce: evita múltiplos envios do modal
         self.selected_cantrips_slugs = selected_cantrips_slugs
 
         self.ability_key, self.casting_mod = _casting_mod_from_final_scores(class_key, final_scores)
@@ -509,6 +580,8 @@ class SpellLevelPickView(ui.View):
             self.lvl1_spells_known = max(1, 1 + self.casting_mod)
 
         self.lvl1_spells = spells_srd.get_spells_by_level_for_class(class_key, 1)
+        self.cantrips_all = spells_srd.get_spells_by_level_for_class(class_key, 0)
+        self.cantrip_by_slug = {sp.get("slug"): sp for sp in self.cantrips_all if sp.get("slug")}
         opts = [discord.SelectOption(label=sp["nome"][:100], value=sp["slug"]) for sp in self.lvl1_spells[:25]]
 
         self.selected_lvl1_slugs: list[str] = []
@@ -524,7 +597,8 @@ class SpellLevelPickView(ui.View):
             if interaction.user.id != self.user.id:
                 return await interaction.response.send_message("Não é sua ficha.", ephemeral=True)
             self.selected_lvl1_slugs = list(self.select.values)
-            await interaction.response.edit_message(embed=self._embed(), view=self)
+            await interaction.response.defer()
+            await interaction.edit_original_response(embed=self._embed(), view=self)
 
         self.select.callback = cb
         self.add_item(self.select)
@@ -535,18 +609,26 @@ class SpellLevelPickView(ui.View):
         async def _cb(interaction: discord.Interaction):
             if interaction.user.id != self.user.id:
                 return await interaction.response.send_message("Não é sua ficha.", ephemeral=True)
-            if len(self.selected_lvl1_slugs) != self.lvl1_spells_known:
-                return await interaction.response.send_message(
-                    f"Você precisa escolher exatamente **{self.lvl1_spells_known}** magias de 1º nível.",
-                    ephemeral=True,
-                )
-            chosen_cantrips = [sp for sp in spells_srd.get_spells_by_level_for_class(self.class_key, 0) if sp.get("slug") in self.selected_cantrips_slugs]
-            chosen_lvl1 = [sp for sp in self.lvl1_spells if sp.get("slug") in self.selected_lvl1_slugs]
-            spell_book = chosen_cantrips + chosen_lvl1
+            if self._processing:
+                return await interaction.response.defer()
+            self._processing = True
+            for item in self.children:
+                try:
+                    item.disabled = True
+                except Exception:
+                    pass
+            try:
+                if len(self.selected_lvl1_slugs) != self.lvl1_spells_known:
+                    return await interaction.response.send_message(
+                        f"Você precisa escolher exatamente **{self.lvl1_spells_known}** magias de 1º nível.",
+                        ephemeral=True,
+                    )
 
-            sheet_magias = []
-            for sp in spell_book:
-                sheet_magias.append(
+                chosen_cantrips = [self.cantrip_by_slug.get(slug) for slug in self.selected_cantrips_slugs]
+                chosen_cantrips = [sp for sp in chosen_cantrips if sp]
+                chosen_lvl1 = [sp for sp in self.lvl1_spells if sp.get("slug") in self.selected_lvl1_slugs]
+                spell_book = chosen_cantrips + chosen_lvl1
+                sheet_magias = [
                     {
                         "nome": sp["nome"],
                         "custo": sp["nivel"],
@@ -555,28 +637,31 @@ class SpellLevelPickView(ui.View):
                         "efeito": sp["descricao"],
                         "nivel_int": sp.get("nivel_int", 0),
                     }
-                )
+                    for sp in spell_book
+                ]
 
-            spell_slots = _slots_lvl1_for_caster(self.class_key)
-            pb = rpg_rules.proficiency_bonus(self.level)
-            dc = 8 + pb + self.casting_mod
-            atk = pb + self.casting_mod
+                spell_slots = _slots_lvl1_for_caster(self.class_key)
+                pb = rpg_rules.proficiency_bonus(self.level)
+                dc = 8 + pb + self.casting_mod
+                atk = pb + self.casting_mod
 
-            await interaction.response.send_modal(
-                FinalizeCharacterModal(
-                    user=self.user,
-                    race=self.race,
-                    class_key=self.class_key,
-                    background=self.background,
-                    base_scores=self.base_scores_before_race,
-                    selected_spells=sheet_magias,
-                    spell_slots=spell_slots,
-                    spell_save_dc=dc,
-                    spell_attack_bonus=atk,
-                    spellcasting_ability_key=self.ability_key,
-                    spellcasting_ability_score=int(self.final_scores.get(self.ability_key) or 10),
+                await interaction.response.send_modal(
+                    FinalizeCharacterModal(
+                        user=self.user,
+                        race=self.race,
+                        class_key=self.class_key,
+                        background=self.background,
+                        base_scores=self.base_scores_before_race,
+                        selected_spells=sheet_magias,
+                        spell_slots=spell_slots,
+                        spell_save_dc=dc,
+                        spell_attack_bonus=atk,
+                        spellcasting_ability_key=self.ability_key,
+                        spellcasting_ability_score=int(self.final_scores.get(self.ability_key) or 10),
+                    )
                 )
-            )
+            finally:
+                self._processing = False
         save_button.callback = _cb
 
     def _embed(self) -> discord.Embed:

@@ -465,22 +465,14 @@ class DeleteCharacterModal(ui.Modal, title="Deletar personagem"):
 
         resolved_slug: str | None = None
         try:
-            load_dotenv()
-            if supabase_create_client is None:
+            from utils.supabase_storage import get_supabase_client
+
+            supabase = get_supabase_client()
+            if supabase is None:
                 return await interaction.response.send_message(
-                    "Supabase não está instalado no ambiente Python.",
+                    "Supabase não configurado/instalado no ambiente Python.",
                     ephemeral=True,
                 )
-
-            supa_url = os.getenv("SUPABASE_URL")
-            supa_key = os.getenv("SUPABASE_KEY")
-            if not supa_url or not supa_key:
-                return await interaction.response.send_message(
-                    "SUPABASE_URL/SUPABASE_KEY não configuradas.",
-                    ephemeral=True,
-                )
-
-            supabase = supabase_create_client(supa_url, supa_key)
             rows_resp = (
                 supabase.table("characters")
                 .select("character_name, sheet_json")

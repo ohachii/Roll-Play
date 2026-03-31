@@ -1,9 +1,9 @@
 {
     "informacoes_basicas": {
         "sistema_rpg": "dnd",
-        "titulo_apelido": "Teste",
+        "titulo_apelido": "Mei Lin",
         "raca_especie": "Humano",
-        "classe_profissao": "Guerreiro"
+        "classe_profissao": "Monge"
     },
     "informacoes_gerais": {
         "nivel_rank": "1",
@@ -12,35 +12,30 @@
         "altura_peso": ""
     },
     "atributos": {
-        "Força": "14",
-        "Destreza": "11",
-        "Constituição": "13",
-        "Inteligência": "15",
-        "Sabedoria": "15",
-        "Carisma": "11"
+        "Força": "18",
+        "Destreza": "17",
+        "Constituição": "17",
+        "Inteligência": "8",
+        "Sabedoria": "16",
+        "Carisma": "16"
     },
     "salvaguardas_proficientes": [
-        "Força",
-        "Constituição"
+        "Destreza",
+        "Sabedoria"
     ],
     "pericias": {
-        "Intuição": {
-            "atributo_base": "Sabedoria",
+        "História": {
+            "atributo_base": "Inteligência",
             "bonus": 0,
             "proficiencia_dnd": "proficiente"
         },
-        "Adestramento": {
-            "atributo_base": "Sabedoria",
+        "Furtividade": {
+            "atributo_base": "Destreza",
             "bonus": 0,
             "proficiencia_dnd": "proficiente"
         },
-        "Atletismo": {
-            "atributo_base": "Força",
-            "bonus": 0,
-            "proficiencia_dnd": "proficiente"
-        },
-        "Intimidação": {
-            "atributo_base": "Carisma",
+        "Prestidigitação": {
+            "atributo_base": "Destreza",
             "bonus": 0,
             "proficiencia_dnd": "proficiente"
         }
@@ -50,27 +45,51 @@
         "vida_maxima": 11,
         "magia_atual": 0,
         "magia_maxima": 0,
-        "defesa": "10",
+        "defesa": "13",
         "resistencia_magica": "",
-        "iniciativa": "0"
+        "iniciativa": "3"
     },
     "criacao_dnd": {
-        "dado_vida_classe": "d10",
-        "antecedente": "Soldado",
+        "dado_vida_classe": "d8",
+        "antecedente": "Órfão",
         "scores_pre_racial": {
-            "Força": 13,
-            "Destreza": 10,
-            "Constituição": 12,
-            "Inteligência": 14,
-            "Sabedoria": 14,
-            "Carisma": 10
+            "Força": 17,
+            "Destreza": 16,
+            "Constituição": 16,
+            "Inteligência": 7,
+            "Sabedoria": 15,
+            "Carisma": 15
         }
     },
-    "inventario": {},
+    "inventario": {
+        "aleatorio": [
+            {
+                "nome": "Baralho de cartas",
+                "quantidade": 1,
+                "peso": "0",
+                "descricao": "",
+                "efeito": "Baralho de cartas"
+            },
+            {
+                "nome": "Tira de tecido",
+                "quantidade": 1,
+                "peso": "0",
+                "descricao": "",
+                "efeito": "Tira de tecido"
+            }
+        ]
+    },
+    "informacoes_extras": {
+        "idiomas": "",
+        "background": "Baralho de cartas, Tira de tecido",
+        "origem": "Órfão",
+        "personalidade": "",
+        "aparencia": ""
+    },
     "locale": "pt",
     "flags_5e": {
         "peso_total_lb": 0.0,
-        "carga_max_lb": 210,
+        "carga_max_lb": 270,
         "sobrecarregado": false
     },
     "condicoes_automaticas": []

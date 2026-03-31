@@ -35,12 +35,21 @@ def calculate_modifier(score: int) -> int:
 def roll_stats_5e() -> list[int]:
     """
     Seis atributos: para cada um rola 4d6 e soma os 3 maiores (descarta o menor).
+    Regra de sanidade: se qualquer atributo final ficar abaixo de 7, rerola o conjunto inteiro.
     """
-    stats: list[int] = []
-    for _ in range(6):
-        rolls = sorted([random.randint(1, 6) for _ in range(4)])
-        stats.append(sum(rolls[1:]))
-    return stats
+    while True:
+        stats: list[int] = []
+        for _ in range(6):
+            # 4d6 drop lowest (mais rápido que ordenar):
+            # - soma dos 4 dados
+            # - subtrai o menor (o menor é descartado)
+            rolls = [random.randint(1, 6) for _ in range(4)]
+            val = sum(rolls) - min(rolls)
+            # teto pré-bônus racial para 4d6 drop lowest.
+            val = min(18, val)
+            stats.append(val)
+        if all(v >= 7 for v in stats):
+            return stats
 
 
 def sum_ability_modifiers(scores: list[int]) -> int:

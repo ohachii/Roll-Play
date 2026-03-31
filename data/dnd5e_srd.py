@@ -194,6 +194,14 @@ BACKGROUNDS: dict[str, dict[str, Any]] = {
         "descricao": "Vive da performance e do carisma.",
         "beneficios": "Bônus de proficiência via perícias fixas do background.",
     },
+    # Alias SRD/PT-BR comum para Entertainer
+    "Artista": {
+        "extra_skills": ["Atuação", "Persuasão"],
+        "extra_languages": [],
+        "extra_items": ["Instrumento musical", "Trajes de palco"],
+        "descricao": "Compat: mesma origem de “Entretenimento”.",
+        "beneficios": "Bônus de proficiência via perícias fixas do background.",
+    },
     "Herói do Povo": {
         "extra_skills": ["Adestramento", "Sobrevivência"],
         "extra_languages": [],
@@ -249,6 +257,14 @@ BACKGROUNDS: dict[str, dict[str, Any]] = {
         "extra_languages": [],
         "extra_items": ["Mapa náutico", "Ferramentas náuticas"],
         "descricao": "Carrega o cheiro de mares e tempestades.",
+        "beneficios": "Bônus de proficiência via perícias fixas do background.",
+    },
+    # Alias SRD/PT-BR comum para Sailor
+    "Marujo": {
+        "extra_skills": ["Percepção", "Sobrevivência"],
+        "extra_languages": [],
+        "extra_items": ["Mapa náutico", "Ferramentas náuticas"],
+        "descricao": "Compat: mesma origem de “Marinheiro”.",
         "beneficios": "Bônus de proficiência via perícias fixas do background.",
     },
     "Soldado": {

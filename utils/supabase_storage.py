@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import time
 from typing import Any
 
 from dotenv import load_dotenv
@@ -23,15 +24,27 @@ def _try_create_client():
     try:
         from supabase import create_client  # type: ignore
 
+        t0 = time.perf_counter()
         _supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
+        dt = (time.perf_counter() - t0) * 1000
+        print(f"[SUPABASE] client criado ({dt:.1f}ms)")
         return _supabase_client
     except Exception:
         _supabase_client = None
         return None
 
 
+# Inicializa o client uma vez (pooling em nível de processo).
+_supabase_client = _try_create_client()
+
+
 def is_supabase_enabled() -> bool:
     return _try_create_client() is not None
+
+
+def get_supabase_client():
+    """Retorna o client Supabase reutilizado (cache em nível de processo)."""
+    return _try_create_client()
 
 
 def _to_int_or_none(v: Any) -> int | None:
@@ -99,6 +112,7 @@ def _find_character_row(
     character_name: str,
     guild_id: int | None,
 ) -> dict[str, Any] | None:
+    t0 = time.perf_counter()
     supa = _try_create_client()
     if supa is None:
         return None
@@ -115,6 +129,8 @@ def _find_character_row(
         .execute()
     )
     rows = getattr(resp, "data", None) or []
+    dt = (time.perf_counter() - t0) * 1000
+    print(f"[DB] _find_character_row ({discord_user_id},{character_name}) guild={guild_id} -> {dt:.1f}ms")
     if not rows:
         return None
     if guild_id is None:
@@ -153,24 +169,35 @@ def save_character_sheet(
     guild_id: int | None,
     ficha: dict[str, Any],
 ) -> None:
+    t0 = time.perf_counter()
     supa = _try_create_client()
     if supa is None:
         raise RuntimeError("Supabase não configurado/instalado.")
+    if guild_id is None:
+        raise ValueError("guild_id é obrigatório para salvar em Supabase.")
 
     payload = _sheet_to_columns(ficha)
     # garante chaves mínimas
     payload["discord_user_id"] = discord_user_id
     payload["character_name"] = character_name
-    payload["guild_id"] = guild_id
+    payload["guild_id"] = int(guild_id)
 
-    existing = _find_character_row(
-        discord_user_id=discord_user_id, character_name=character_name, guild_id=guild_id
-    )
-    if existing and existing.get("id"):
-        cid = existing["id"]
-        supa.table("characters").update(payload).eq("id", cid).execute()
-    else:
-        supa.table("characters").insert(payload).execute()
+    try:
+        # Se já existir, anexa `id` para garantir que o `upsert` faça update
+        # (evita duplicar registros caso a tabela não tenha uma constraint
+        # compatível com o upsert sem `on_conflict`).
+        existing = _find_character_row(
+            discord_user_id=discord_user_id, character_name=character_name, guild_id=guild_id
+        )
+        if existing and existing.get("id"):
+            payload["id"] = existing["id"]
+
+        supa.table("characters").upsert(payload).execute()
+    except Exception as e:
+        print(f"[DB ERROR] {e}")
+        raise
+    dt = (time.perf_counter() - t0) * 1000
+    print(f"[DB] save_character_sheet user={discord_user_id} name={character_name} guild={guild_id} -> {dt:.1f}ms")
 
 
 def delete_character_sheet(
@@ -179,6 +206,7 @@ def delete_character_sheet(
     character_name: str,
     guild_id: int | None = None,
 ) -> bool:
+    t0 = time.perf_counter()
     supa = _try_create_client()
     if supa is None:
         return False
@@ -189,10 +217,13 @@ def delete_character_sheet(
         return False
     cid = row["id"]
     supa.table("characters").delete().eq("id", cid).execute()
+    dt = (time.perf_counter() - t0) * 1000
+    print(f"[DB] delete_character_sheet user={discord_user_id} name={character_name} guild={guild_id} -> {dt:.1f}ms")
     return True
 
 
 def list_character_names(*, discord_user_id: int, guild_id: int | None = None) -> list[str]:
+    t0 = time.perf_counter()
     supa = _try_create_client()
     if supa is None:
         return []
@@ -207,5 +238,7 @@ def list_character_names(*, discord_user_id: int, guild_id: int | None = None) -
         if isinstance(name, str):
             out.append(name)
     out.sort(key=lambda s: s.lower())
+    dt = (time.perf_counter() - t0) * 1000
+    print(f"[DB] list_character_names user={discord_user_id} guild={guild_id} -> {dt:.1f}ms")
     return out
 

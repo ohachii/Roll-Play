@@ -106,15 +106,11 @@ class NPCContext:
         if callable(globals().get("is_supabase_enabled")) and is_supabase_enabled():
             # Consulta por `guild_id` e filtra em `sheet_json.visivel_para_players`.
             try:
-                from dotenv import load_dotenv
+                from utils.supabase_storage import get_supabase_client
 
-                load_dotenv()
-                supa_url = os.getenv("SUPABASE_URL")
-                supa_key = os.getenv("SUPABASE_KEY")
-                if not supa_url or not supa_key or supabase_create_client is None:
+                supa = get_supabase_client()
+                if supa is None:
                     return []
-
-                supa = supabase_create_client(supa_url, supa_key)
                 resp = (
                     supa.table("characters")
                     .select("character_name, sheet_json")
